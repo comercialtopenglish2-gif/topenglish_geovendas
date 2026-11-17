@@ -58,8 +58,15 @@ export function bloqueadoPorTentativas(ip, email) {
 function mensagemErro(m) {
   const t = String(m || "");
   if (/desactivat|desativad/i.test(t)) return "Usuário desativado no sistema da Top English.";
-  if (/not found|incorrect|inválid|invalid|senha|password/i.test(t)) return "E-mail ou senha incorretos.";
-  return "Não foi possível entrar com esses dados.";
+  if (/not found|não encontrad/i.test(t)) return "E-mail não encontrado no sistema da Top English. Confira se é o mesmo e-mail do CMS.";
+  if (/incorrect|incorret|senha|password/i.test(t)) return "Senha incorreta para este e-mail no sistema da Top English.";
+  return "O sistema da Top English não aceitou o login" + (t ? " (" + t.slice(0, 80) + ")" : "") + ".";
+}
+// resumo seguro de uma resposta do CMS para o log: status, campos e a mensagem do CMS (nunca valores de token)
+function resumo(r) {
+  const c = (r && r.corpo) || {};
+  const campos = c && typeof c === "object" ? Object.keys(c).concat(c.content && typeof c.content === "object" ? Object.keys(c.content).map(k => "content." + k) : []) : [];
+  return `HTTP ${r && r.status}, campos [${campos.join(", ")}]${c.message ? ", mensagem do CMS: " + String(c.message).slice(0, 80) : ""}`;
 }
 
 // payload do JWT de sessão do CMS (só para ler user_id e exp de um token que ACABOU de vir do CMS, servidor-a-servidor)
@@ -85,15 +92,17 @@ export async function loginCms(email, password) {
     } else {
       const qs = new URLSearchParams({ email, pass: password }).toString();
       r = await cms("/v1/authentication.json?" + qs, { method: "GET" });
-      const token = r.corpo && (r.corpo.token || r.corpo.token_auth);
-      if (r.status < 300 && token && (!r.corpo.status || r.corpo.status !== "ERROR")) {
+      const c = (r.corpo && r.corpo.content) || {};
+      const token = r.corpo && (r.corpo.token || r.corpo.token_auth || c.token || c.token_auth);
+      if (r.status < 300 && token && r.corpo.status !== "ERROR") {
         const p = lerPayload(token);
-        return { ok: true, token, nome: null, userId: p.user_id ?? null, exp: p.exp ? p.exp * 1000 : null };
+        return { ok: true, token, nome: c.name || r.corpo.name || null, userId: p.user_id ?? null, exp: p.exp ? p.exp * 1000 : null };
       }
     }
   } catch {
     return { ok: false, status: 502, message: "Não consegui falar com o sistema da Top English agora. Tente novamente." };
   }
+  console.warn("Login no CMS (" + (process.env.CMS_PASSWORD_SECRET ? "v2" : "v1") + ") não aceito: " + resumo(r));
   if (r && r.status >= 500) return { ok: false, status: 502, message: "O sistema da Top English não respondeu. Tente novamente." };
   const m = String((r && r.corpo && r.corpo.message) || "");
   if (process.env.CMS_PASSWORD_SECRET && /payload|signature|assinatura|decode/i.test(m) && !/password|not found|desactivat/i.test(m)) {
@@ -103,25 +112,33 @@ export async function loginCms(email, password) {
   return { ok: false, status: 401, message: mensagemErro(r && r.corpo && r.corpo.message) };
 }
 
-// Confere o token no CMS (dashboard do webbook). Devolve { ok:true, perfil } | { ok:false, status:401 } | { ok:false, status:503 }
+// Confere o token no CMS. Devolve { ok:true, perfil } | { ok:false, status:401 } | { ok:false, status:503 }
+// 1º: GET /webbook/teacher/dashboard (traz o perfil). Se o dashboard falhar por outro motivo que não seja token
+// inválido (ex.: franqueador sem turmas), confere em GET /v1/enrollment.json, que vale para qualquer User.
 const cache = new Map();
+const tokenRecusado = (st, b) => st === 401 || st === 403 || (b && b.status === "ERROR" && (b.code === 101 || /token|expir|auth|inválid|invalid|unauthori|payload|login/i.test(String(b.message || ""))));
 export async function validarToken(token) {
   if (!token) return { ok: false, status: 401 };
   const k = sha(token);
   const c = cache.get(k);
   if (c && Date.now() - c.em < TTL_CACHE_MS) return { ok: true, perfil: c.perfil };
+  const guardar = perfil => { cache.set(k, { perfil, em: Date.now() }); if (cache.size > 5000) for (const [kk, v] of cache) if (Date.now() - v.em > TTL_CACHE_MS) cache.delete(kk); return { ok: true, perfil }; };
+  const auth = { Authorization: "Bearer " + token };
   let r;
-  try { r = await cms("/webbook/teacher/dashboard", { headers: { Authorization: "Bearer " + token } }); }
-  catch { cache.delete(k); return { ok: false, status: 503 }; }
+  try { r = await cms("/webbook/teacher/dashboard", { headers: auth }); }
+  catch { cache.delete(k); console.warn("Validação: dashboard do CMS sem resposta."); return { ok: false, status: 503 }; }
   const b = r.corpo || {};
-  if (r.status === 200 && b.status !== "ERROR") {
-    const perfil = (b.content && (b.content.role || b.content.my_profile_name)) || null;
-    cache.set(k, { perfil, em: Date.now() });
-    if (cache.size > 5000) for (const [kk, v] of cache) if (Date.now() - v.em > TTL_CACHE_MS) cache.delete(kk);
-    return { ok: true, perfil };
-  }
+  if (r.status === 200 && b.status !== "ERROR") return guardar((b.content && (b.content.role || b.content.my_profile_name)) || null);
+  if (tokenRecusado(r.status, b)) { cache.delete(k); return { ok: false, status: 401 }; }
+  console.warn(`Validação: dashboard do CMS respondeu ${r.status}${b.code ? " código " + b.code : ""}; conferindo por /v1/enrollment.`);
+  let r2;
+  try { r2 = await cms("/v1/enrollment.json", { headers: auth }); }
+  catch { cache.delete(k); return { ok: false, status: 503 }; }
+  const b2 = r2.corpo;
+  if (r2.status === 200 && !(b2 && !Array.isArray(b2) && b2.status === "ERROR")) return guardar(null);
   cache.delete(k);
-  if (r.status === 401 || r.status === 403 || (b.status === "ERROR" && /token|expir|auth|inválid|invalid|unauthori|login/i.test(String(b.message || b.type || "")))) return { ok: false, status: 401 };
+  if (tokenRecusado(r2.status, b2 && !Array.isArray(b2) ? b2 : null)) return { ok: false, status: 401 };
+  console.warn(`Validação: /v1/enrollment respondeu ${r2.status}.`);
   return { ok: false, status: 503 };
 }
 

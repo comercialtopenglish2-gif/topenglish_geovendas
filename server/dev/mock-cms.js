@@ -50,9 +50,17 @@ http.createServer(async (req, res) => {
   if (url.pathname === "/webbook/teacher/dashboard") {
     const t = String(req.headers.authorization || "").replace(/^Bearer /, "");
     const p = verificar(t, JWT_SECRET);
-    if (!p || p.exp * 1000 < Date.now()) return json(res, 401, { status: "ERROR", message: "Token inválido ou expirado.", type: "auth", code: 401 });
+    if (!p || p.exp * 1000 < Date.now()) return json(res, 401, { status: "ERROR", message: "Invalid Payload", type: "error", code: 101 });
     const u = USERS.find(x => x.id === p.user_id);
+    // como pode acontecer na produção: o dashboard do webbook falha para quem não é professor
+    if (u.role === "Franqueador") return json(res, 500, { status: "ERROR", message: "undefined method for nil", type: "error", code: 500 });
     return json(res, 200, { status: "SUCCESS", message: "", content: { role: u.role, agenda: [], totais: {} } });
+  }
+  if (url.pathname === "/v1/enrollment.json" || url.pathname === "/v1/enrollment") {
+    const t = String(req.headers.authorization || "").replace(/^Bearer /, "") || url.searchParams.get("token");
+    const p = verificar(t, JWT_SECRET);
+    if (!p || p.exp * 1000 < Date.now()) return json(res, 401, { status: "ERROR", message: "Invalid Payload", type: "error", code: 101 });
+    return json(res, 200, []);
   }
   json(res, 404, { status: "ERROR", message: "Not found" });
 }).listen(PORT, () => console.log("CMS falso (produção) em http://localhost:" + PORT));

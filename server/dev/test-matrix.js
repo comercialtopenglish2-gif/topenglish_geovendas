@@ -31,9 +31,9 @@ const api = (cookie, method, caminho, body) => req(caminho, { cookie, method, bo
 
   // 2. credenciais
   const errada = await login("master.rj@teste.com", "x");
-  ok("senha errada: mensagem, sem cookie", errada.r.status === 401 && !errada.cookie && /incorretos/.test(errada.r.json.message), errada.r.json && errada.r.json.message);
+  ok("senha errada: mensagem, sem cookie", errada.r.status === 401 && !errada.cookie && /Senha incorreta/.test(errada.r.json.message), errada.r.json && errada.r.json.message);
   const naoExiste = await login("ninguem@teste.com");
-  ok("e-mail inexistente: mesma mensagem, sem cookie", naoExiste.r.status === 401 && !naoExiste.cookie && /incorretos/.test(naoExiste.r.json.message));
+  ok("e-mail inexistente: avisa, sem cookie", naoExiste.r.status === 401 && !naoExiste.cookie && /não encontrado/.test(naoExiste.r.json.message));
   const des = await login("desativado@teste.com");
   ok("desativado no CMS: recusado", des.r.status === 401 && !des.cookie && /desativado/i.test(des.r.json.message), des.r.json && des.r.json.message);
 

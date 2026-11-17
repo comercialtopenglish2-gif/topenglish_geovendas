@@ -41,15 +41,16 @@ function proximoSeguro(n) {
 }
 
 app.post("/auth/login", express.json({ limit: "10kb" }), async (req, res) => {
-  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  const emailDigitado = String((req.body && req.body.email) || "").trim();
+  const email = emailDigitado.toLowerCase();
   const password = String((req.body && req.body.password) || "");
   if (!email || !password) return res.status(400).json({ message: "Informe e-mail e senha." });
   if (auth.bloqueadoPorTentativas(req.ip, email)) return res.status(429).json({ message: "Muitas tentativas. Aguarde 15 minutos e tente de novo." });
-  const r = await auth.loginCms(email, password);
+  const r = await auth.loginCms(emailDigitado, password);
   if (!r.ok) return res.status(r.status).json({ message: r.message });
   // o token acabou de vir do CMS; confere que ele abre a API (e lê o perfil do CMS, só informativo)
   const v = await auth.validarToken(r.token);
-  if (!v.ok) return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "O sistema da Top English recusou a sessão." : "Não consegui validar seu acesso agora. Tente novamente." });
+  if (!v.ok) { console.warn("Login: o CMS aceitou a senha, mas a conferência do token falhou (" + v.status + ")."); return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "O sistema da Top English recusou a sessão." : "Não consegui validar seu acesso agora. Tente novamente." }); }
   const pessoaId = r.userId != null ? "cms-" + r.userId : "em-" + crypto.createHash("sha256").update(email).digest("hex").slice(0, 16);
   try { await db.registrarPessoa({ pessoaId, email, nome: r.nome, perfil: v.perfil }); } catch (e) { console.error("registrarPessoa falhou:", e.message); }
   let acesso = null;
@@ -58,7 +59,7 @@ app.post("/auth/login", express.json({ limit: "10kb" }), async (req, res) => {
     if (!acesso && franqueadoresFixos().includes(email)) { await db.salvarAcesso(email, { papel: "franqueador" }, "railway"); acesso = await db.acessoDe(email); }
   } catch (e) { return res.status(503).json({ message: "Banco indisponível. Tente novamente." }); }
   const id = identidade({ pessoaId, email }, acesso, r.nome);
-  if (!id.ok) return res.status(403).json({ message: MSG_SEM_ACESSO });
+  if (!id.ok) { console.info("Login: senha correta, mas o e-mail ainda não tem acesso liberado no GeoVenda."); return res.status(403).json({ message: MSG_SEM_ACESSO }); }
   try { await auth.criarSessao(res, { pessoaId, email, token: r.token, exp: r.exp }); }
   catch (e) { console.error("criarSessao falhou:", e.message); return res.status(503).json({ message: "Banco indisponível. Tente novamente." }); }
   res.set("Cache-Control", "no-store").json({ ok: true, next: proximoSeguro(req.body && req.body.next) });
