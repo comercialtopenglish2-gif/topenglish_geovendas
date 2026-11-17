@@ -172,4 +172,5 @@ Pendências antes do deploy:
 | D3 | **(b)** tabela de-para `unidades` (unit_id → UF, cidade, nome), editável pelo franqueador em `/unidades` e preenchida sozinha quando o CMS mandar `unit.state` (recomendação do guia, adotada por padrão) |
 | D4 | **(a)** PostgreSQL no Railway, com documentos JSONB acessados pelo servidor |
 | D5 | **(a)** IA ligada pela API da Anthropic no servidor, com limite diário por pessoa |
+| D6 (17/11) | **Login pela API que está em produção no CMS** (`docs/GUIA_INTEGRACAO_FRONT_API.md`): o namespace `/admin` não existe em produção. Login v2 (`/v2/webbook/login`, assinado no servidor com `CMS_PASSWORD_SECRET`) ou v1 (`/v1/authentication`, servidor-a-servidor); validação por `/webbook/teacher/dashboard`. Papel e unidade vêm da tabela `acessos`, mantida pelo franqueador em `/acessos`; os franqueadores iniciais vêm de `GV_FRANQUEADORES` |
 | Extra | coleções do Radar (`pedidos`, `relatorios`, `dicas`, `palavras`, `horarios`, `monitor`, `proprios`) continuam compartilhadas entre todos os logados, como hoje |

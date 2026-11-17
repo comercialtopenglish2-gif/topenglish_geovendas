@@ -1,46 +1,46 @@
-// ÚNICO lugar com o mapa role_id do Top English CMS -> permissões do GeoVenda.
-// Papel ausente neste mapa = bloqueado (falha fechada).
+// ÚNICO lugar com o mapa de papéis do GeoVenda.
+// A API de produção do CMS não informa role_id nem unidade (docs/GUIA_INTEGRACAO_FRONT_API.md, seção 2).
+// Por isso o papel vem da tabela `acessos` do GeoVenda, mantida pelo franqueador em /acessos.
+// Quem não está em `acessos` (inclusive professores) fica bloqueado: falha fechada.
 // Decisão D2 (17/11/2026): franqueador vê tudo; master só a unidade dele; professor bloqueado.
 
 export const PAPEIS = {
-  1: { papel: "master",  rotulo: "Franqueador", todosEstados: true,  todasUnidades: true,  editaBase: true  },
-  2: { papel: "unidade", rotulo: "Master",      todosEstados: false, todasUnidades: false, editaBase: false },
-  // 3 (professor): ausente = bloqueado, até decisão em contrário.
+  franqueador: { papel: "master",  rotulo: "Franqueador", todosEstados: true,  editaBase: true  },
+  master:      { papel: "unidade", rotulo: "Master",      todosEstados: false, editaBase: false },
 };
 
-export const MSG_SEM_ACESSO = "Perfil sem acesso ao GeoVenda.";
+export const MSG_SEM_ACESSO = "Seu acesso ao GeoVenda ainda não foi liberado. Fale com o franqueador.";
 export const MSG_SEM_UF = "Sua unidade ainda não tem estado configurado. Fale com o franqueador.";
 
-export function papelDe(roleId) {
-  return Object.prototype.hasOwnProperty.call(PAPEIS, roleId) ? PAPEIS[roleId] : null;
+// e-mails de franqueador definidos no Railway (GV_FRANQUEADORES) entram sempre como franqueador
+export function franqueadoresFixos() {
+  return String(process.env.GV_FRANQUEADORES || "").split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
 }
 
-// Monta a identidade do GeoVenda a partir do /me do CMS e do de-para de unidades (D3b).
-// `dePara` = linha da tabela `unidades` ({ unit_id, nome, uf, cidade }) ou null.
-export function identidade(me, dePara) {
-  const user = (me && me.user) || {};
-  const p = papelDe(Number(user.role_id));
+// acesso = linha de `acessos` + unidade ({ papel, unit_id, ativo, unidade_nome, uf, cidade }) ou null
+export function identidade(sessao, acesso, nome) {
+  const email = String(sessao.email || "").toLowerCase();
+  let papelKey = acesso && acesso.ativo ? acesso.papel : null;
+  if (franqueadoresFixos().includes(email)) papelKey = "franqueador";
+  const p = papelKey ? PAPEIS[papelKey] : null;
   if (!p) return { ok: false, motivo: MSG_SEM_ACESSO };
-  const unit = (me && me.unit) || null;
-  const uf = (dePara && dePara.uf) || (unit && unit.state) || null;
-  const cidade = (dePara && dePara.cidade) || (unit && unit.city) || null;
-  const nomeUnidade = (dePara && dePara.nome) || (unit && unit.name) || null;
-  const pendente = !p.todosEstados && !uf; // master sem UF resolvida: não libera dados
+  const unitId = p.todosEstados ? null : (acesso && acesso.unit_id != null ? Number(acesso.unit_id) : null);
+  const uf = acesso && acesso.uf ? String(acesso.uf) : null;
+  const pendente = !p.todosEstados && (!unitId || !uf); // master sem unidade ou sem UF: não libera dados
   return {
     ok: true,
-    pessoaId: "cms-" + user.id,
-    roleId: Number(user.role_id),
+    pessoaId: sessao.pessoaId,
+    email,
+    nome: nome || null,
     papel: p.papel,
     rotulo: p.rotulo,
     master: p.papel === "master",
     editaBase: p.editaBase,
-    todasUnidades: p.todasUnidades,
-    unitId: user.unit_id == null ? null : Number(user.unit_id),
-    // espaço do GeoFunil: por unidade do CMS (D2/D3). Franqueador sem unidade usa o próprio espaço.
-    espaco: user.unit_id != null ? "unit-" + user.unit_id : "cms-" + user.id,
-    unidade: nomeUnidade,
-    uf: p.todosEstados ? (uf || null) : uf,
-    cidade,
+    unitId,
+    espaco: unitId ? "unit-" + unitId : sessao.pessoaId,
+    unidade: unitId && acesso ? acesso.unidade_nome || null : null,
+    uf: p.todosEstados ? null : uf,
+    cidade: unitId && acesso ? acesso.cidade || null : null,
     pendente,
     motivoPendente: pendente ? MSG_SEM_UF : null,
   };

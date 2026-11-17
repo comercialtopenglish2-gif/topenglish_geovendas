@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 import * as auth from "./auth.js";
 import * as db from "./db.js";
 import * as ai from "./ai.js";
-import { identidade, MSG_SEM_ACESSO } from "./roles.js";
+import { identidade, MSG_SEM_ACESSO, franqueadoresFixos } from "./roles.js";
+import crypto from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(__dirname, "..");
@@ -40,57 +41,65 @@ function proximoSeguro(n) {
 }
 
 app.post("/auth/login", express.json({ limit: "10kb" }), async (req, res) => {
-  const email = String((req.body && req.body.email) || "").trim();
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
   const password = String((req.body && req.body.password) || "");
   if (!email || !password) return res.status(400).json({ message: "Informe e-mail e senha." });
   if (auth.bloqueadoPorTentativas(req.ip, email)) return res.status(429).json({ message: "Muitas tentativas. Aguarde 15 minutos e tente de novo." });
   const r = await auth.loginCms(email, password);
   if (!r.ok) return res.status(r.status).json({ message: r.message });
-  const v = await auth.validar(r.token); // confere o papel real pelo /me
-  if (!v.ok) return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "Sessão recusada pelo CMS." : "Não consegui validar seu acesso agora. Tente novamente." });
-  const me = { ...v.me, user: { ...(r.user || {}), ...(v.me.user || {}) }, unit: (v.me.unit || r.unit) ? { ...(r.unit || {}), ...(v.me.unit || {}) } : null };
-  const id = identidade(me, null);
-  if (!id.ok) { auth.esquecer(r.token); return res.status(403).json({ message: MSG_SEM_ACESSO }); }
-  try { await db.registrarPessoa(me); } catch (e) { console.error("registrarPessoa falhou:", e.message); }
-  auth.gravarSessao(res, r.token, r.horas);
+  // o token acabou de vir do CMS; confere que ele abre a API (e lê o perfil do CMS, só informativo)
+  const v = await auth.validarToken(r.token);
+  if (!v.ok) return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "O sistema da Top English recusou a sessão." : "Não consegui validar seu acesso agora. Tente novamente." });
+  const pessoaId = r.userId != null ? "cms-" + r.userId : "em-" + crypto.createHash("sha256").update(email).digest("hex").slice(0, 16);
+  try { await db.registrarPessoa({ pessoaId, email, nome: r.nome, perfil: v.perfil }); } catch (e) { console.error("registrarPessoa falhou:", e.message); }
+  let acesso = null;
+  try {
+    acesso = await db.acessoDe(email);
+    if (!acesso && franqueadoresFixos().includes(email)) { await db.salvarAcesso(email, { papel: "franqueador" }, "railway"); acesso = await db.acessoDe(email); }
+  } catch (e) { return res.status(503).json({ message: "Banco indisponível. Tente novamente." }); }
+  const id = identidade({ pessoaId, email }, acesso, r.nome);
+  if (!id.ok) return res.status(403).json({ message: MSG_SEM_ACESSO });
+  try { await auth.criarSessao(res, { pessoaId, email, token: r.token, exp: r.exp }); }
+  catch (e) { console.error("criarSessao falhou:", e.message); return res.status(503).json({ message: "Banco indisponível. Tente novamente." }); }
   res.set("Cache-Control", "no-store").json({ ok: true, next: proximoSeguro(req.body && req.body.next) });
 });
 
-app.post("/auth/logout", (req, res) => {
-  auth.esquecer(auth.lerCookie(req, auth.COOKIE));
+app.post("/auth/logout", async (req, res) => {
+  try { await auth.encerrarSessao(req); } catch {}
   auth.apagarSessao(res);
   res.set("Cache-Control", "no-store").json({ ok: true });
 });
 
 // ---------- portão: tudo daqui para baixo exige sessão ----------
 const querHtml = req => req.method === "GET" && !req.path.startsWith("/api/") && (req.accepts(["html", "json"]) === "html");
-const pessoasNome = new Map();
+const semSessao = (req, res) => {
+  if (auth.lerCookie(req, auth.COOKIE)) auth.apagarSessao(res);
+  if (querHtml(req)) return res.redirect(302, "/login?next=" + encodeURIComponent(proximoSeguro(req.originalUrl)));
+  return res.status(401).json({ code: "unauthenticated", message: "Faça login novamente." });
+};
 
 app.use(async (req, res, next) => {
-  const token = auth.lerCookie(req, auth.COOKIE);
-  const v = await auth.validar(token);
+  let sessao;
+  try { sessao = await auth.lerSessao(req); }
+  catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
+  if (!sessao) return semSessao(req, res);
+  const v = await auth.validarToken(sessao.token);
   if (!v.ok) {
-    if (v.status === 401) {
-      if (token) auth.apagarSessao(res);
-      if (querHtml(req)) return res.redirect(302, "/login?next=" + encodeURIComponent(proximoSeguro(req.originalUrl)));
-      return res.status(401).json({ code: "unauthenticated", message: "Faça login novamente." });
-    }
+    if (v.status === 401) { try { await auth.encerrarSessao(req); } catch {} return semSessao(req, res); }
     res.set("Retry-After", "30");
     if (querHtml(req)) return res.status(503).type("html").send(paginaAviso("Não consegui validar seu acesso agora. Tente novamente em instantes."));
     return res.status(503).json({ code: "unavailable", message: "Não consegui validar seu acesso agora. Tente novamente." });
   }
-  let dp = null;
-  try { dp = await db.dePara(v.me.user && v.me.user.unit_id); } catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
-  const id = identidade(v.me, dp);
+  let acesso = null, nome = null;
+  try { [acesso, nome] = await Promise.all([db.acessoDe(sessao.email), db.nomePessoa(sessao.pessoaId)]); }
+  catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
+  const id = identidade(sessao, acesso, nome);
   if (!id.ok) {
+    try { await auth.encerrarSessao(req); } catch {}
     auth.apagarSessao(res);
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(MSG_SEM_ACESSO, true));
     return res.status(403).json({ code: "forbidden", message: MSG_SEM_ACESSO });
   }
-  if (!pessoasNome.has(id.pessoaId)) {
-    try { const p = await db.perfis([id.pessoaId]); pessoasNome.set(id.pessoaId, (p[id.pessoaId] || {}).name || null); } catch {}
-  }
-  id.nome = pessoasNome.get(id.pessoaId) || null;
   req.gv = id;
   if (id.pendente && req.path !== "/api/session" && req.path !== "/claude-shim.js") {
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(id.motivoPendente, true));
@@ -102,7 +111,7 @@ app.use(async (req, res, next) => {
 // ---------- API ----------
 const json2mb = express.json({ limit: "2mb" });
 const sessaoPublica = id => ({
-  pessoa: { id: id.pessoaId, nome: id.nome },
+  pessoa: { id: id.pessoaId, nome: id.nome || id.email, email: id.email },
   papel: id.papel, rotulo: id.rotulo, master: id.master, editaBase: id.editaBase,
   unidade: { id: id.unitId, nome: id.unidade, uf: id.uf, cidade: id.cidade },
   espaco: id.espaco, pendente: id.pendente,
@@ -134,16 +143,29 @@ app.post("/api/pessoas", json2mb, async (req, res) => {
 app.get("/api/ai/limits", (req, res) => res.json(ai.limites()));
 app.post("/api/ai/sample", express.json({ limit: "30mb" }), (req, res) => ai.sample(req, res, req.gv).catch(e => trataErro(res, e)));
 
-// de-para de unidades (D3b), só franqueador
+// acessos e unidades (a API de produção do CMS não informa papel nem unidade): só franqueador
 const soMaster = (req, res, next) => req.gv.master ? next() : res.status(403).json({ code: "forbidden", message: "Somente franqueador." });
-app.get("/api/unidades", soMaster, async (req, res) => { try { res.json(await db.listarUnidades()); } catch (e) { trataErro(res, e); } });
+app.get("/api/acessos", soMaster, async (req, res) => {
+  try { res.json({ ...(await db.painelAcessos()), fixos: franqueadoresFixos(), eu: req.gv.email }); } catch (e) { trataErro(res, e); }
+});
+app.post("/api/unidades", soMaster, json2mb, async (req, res) => { try { res.json(await db.criarUnidade(req.body || {})); } catch (e) { trataErro(res, e); } });
 app.put("/api/unidades/:id", soMaster, json2mb, async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ code: "invalid_argument", message: "Unidade inválida." });
   try { await db.salvarUnidade(req.params.id, req.body || {}); res.json({ ok: true }); } catch (e) { trataErro(res, e); }
 });
-app.get("/unidades", (req, res) => {
-  if (!req.gv.master) return res.status(403).type("html").send(paginaAviso("Somente o franqueador configura as unidades."));
-  res.set("Cache-Control", "private, no-store").sendFile(path.join(RAIZ, "server", "paginas", "unidades.html"));
+app.put("/api/acessos/:email", soMaster, json2mb, async (req, res) => {
+  const email = String(req.params.email || "").toLowerCase();
+  if (email === req.gv.email && (req.body || {}).papel !== "franqueador") return res.status(400).json({ code: "invalid_argument", message: "Você não pode tirar o seu próprio acesso de franqueador." });
+  try { await db.salvarAcesso(email, req.body || {}, req.gv.email); res.json({ ok: true }); } catch (e) { trataErro(res, e); }
+});
+app.delete("/api/acessos/:email", soMaster, async (req, res) => {
+  const email = String(req.params.email || "").toLowerCase();
+  if (email === req.gv.email) return res.status(400).json({ code: "invalid_argument", message: "Você não pode remover o seu próprio acesso." });
+  try { await db.removerAcesso(email); res.json({ ok: true }); } catch (e) { trataErro(res, e); }
+});
+app.get(["/acessos", "/unidades"], (req, res) => {
+  if (!req.gv.master) return res.status(403).type("html").send(paginaAviso("Somente o franqueador libera acessos."));
+  res.set("Cache-Control", "private, no-store").sendFile(path.join(RAIZ, "server", "paginas", "acessos.html"));
 });
 app.use("/api", (req, res) => res.status(404).json({ code: "not_found", message: "Rota inexistente." }));
 

@@ -26,6 +26,8 @@ O agente:
 5. Clique no serviço **geovenda → Variables** e crie:
    - `DATABASE_URL` → **Add Reference** → escolha o Postgres;
    - `CMS_BASE_URL` = `https://cms.topenglish.com.br`;
+   - `GV_FRANQUEADORES` = o seu e-mail de franqueador no sistema da Top English (mais de um, separados por vírgula);
+   - Opcional: `CMS_PASSWORD_SECRET` = a chave `password_secret` do CMS, se o time do CMS fornecer. Com ela, a senha não viaja no endereço do login.
    - `NODE_ENV` = `production`;
    - `ANTHROPIC_API_KEY` = sua chave da Anthropic. Crie em https://console.anthropic.com e **cole direto no Railway**. Nunca mande a chave no chat, no código ou no GitHub.
    - Opcional: `AI_DAILY_CALLS` = limite de chamadas de IA por pessoa por dia (padrão 150).
@@ -37,8 +39,8 @@ O agente:
 
 1. Abra o endereço `…up.railway.app`. Ele deve mandar para a tela de login.
 2. Entre com a sua conta de **franqueador** do sistema da Top English. Digite a senha só na tela de login.
-3. Abra `…/unidades` e preencha a **UF** e a **cidade** de cada unidade que aparecer. As unidades aparecem depois que alguém delas tenta entrar pela primeira vez.
-4. Peça a um master para entrar. Ele deve ver só o estado e a unidade dele.
+3. No menu, clique em **Liberar acessos** (ou abra `…/acessos`). Crie as **unidades** (nome, UF, cidade).
+4. Peça a um master para tentar entrar. Ele aparece em **Pessoas aguardando liberação**: clique em **Liberar**, escolha a unidade e confirme. Quando ele entrar de novo, deve ver só o estado e a unidade dele.
 5. Sem estar logado (numa janela anônima), abra `…/templates.js` e `…/data/MG.json`. As duas devem mandar para o login.
 
 ## 5. Domínio próprio [VOCÊ]
@@ -65,8 +67,8 @@ Leads, perfis, treinos e funil cadastrados no GeoVenda de dentro do Claude **nã
 |---|---|
 | Deploy falha | Railway → **Deploy Logs** e mande o erro ao agente |
 | Fica reiniciando | conferir **Healthcheck Path** = `/healthz` e se `DATABASE_URL` está como referência ao Postgres |
-| "Perfil sem acesso ao GeoVenda" | é um professor (role 3) ou um papel não liberado |
-| "Sua unidade ainda não tem estado configurado" | o franqueador preenche a UF em `/unidades` |
+| "Seu acesso ao GeoVenda ainda não foi liberado" | o franqueador libera a pessoa em `/acessos` |
+| "O login está mal configurado no servidor" | a `CMS_PASSWORD_SECRET` está errada: corrija ou apague a variável |
 | "Não consegui validar seu acesso agora" | o CMS da Top English está fora do ar; espere e tente de novo |
 | Botões de IA desativados | falta `ANTHROPIC_API_KEY` no Railway |
 | Pede login de novo depois de um dia | normal: o login do CMS vale 24 h |

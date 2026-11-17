@@ -138,44 +138,75 @@ export async function delDoc(id, p) {
   return { ok: true };
 }
 
-// ---------- pessoas e unidades ----------
-export async function registrarPessoa(me) {
-  const u = me.user || {};
+// ---------- pessoas, unidades e acessos ----------
+export async function registrarPessoa({ pessoaId, email, nome, perfil }) {
   await getPool().query(
-    `INSERT INTO pessoas(id,nome,email,role_id,unit_id,ultimo_login) VALUES ($1,$2,$3,$4,$5,now())
-     ON CONFLICT (id) DO UPDATE SET nome=EXCLUDED.nome, email=EXCLUDED.email, role_id=EXCLUDED.role_id, unit_id=EXCLUDED.unit_id, ultimo_login=now()`,
-    ["cms-" + u.id, u.name || null, u.email || null, u.role_id ?? null, u.unit_id ?? null]);
-  // preenche o de-para automaticamente quando o CMS trouxer o dado (D3b)
-  const un = me.unit;
-  if (un && un.id != null) {
-    await getPool().query(
-      `INSERT INTO unidades(unit_id,nome,uf,cidade) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (unit_id) DO UPDATE SET nome=coalesce(unidades.nome,EXCLUDED.nome), uf=coalesce(unidades.uf,EXCLUDED.uf), cidade=coalesce(unidades.cidade,EXCLUDED.cidade)`,
-      [un.id, un.name || null, un.state ? String(un.state).slice(0, 2).toUpperCase() : null, un.city || null]);
-  }
+    `INSERT INTO pessoas(id,nome,email,perfil_cms,ultimo_login) VALUES ($1,$2,$3,$4,now())
+     ON CONFLICT (id) DO UPDATE SET nome=coalesce(EXCLUDED.nome,pessoas.nome), email=EXCLUDED.email,
+       perfil_cms=coalesce(EXCLUDED.perfil_cms,pessoas.perfil_cms), ultimo_login=now()`,
+    [pessoaId, nome || null, String(email).toLowerCase(), perfil || null]);
 }
 
-export async function dePara(unitId) {
-  if (unitId == null) return null;
-  const r = await getPool().query("SELECT unit_id, nome, uf, cidade FROM unidades WHERE unit_id=$1", [unitId]);
+export async function acessoDe(email) {
+  const r = await getPool().query(
+    `SELECT a.email, a.papel, a.unit_id, a.ativo, u.nome AS unidade_nome, u.uf, u.cidade
+       FROM acessos a LEFT JOIN unidades u ON u.unit_id = a.unit_id WHERE a.email = $1`, [String(email || "").toLowerCase()]);
   return r.rows[0] || null;
 }
 
-export async function listarUnidades() {
-  const r = await getPool().query(
-    `SELECT u.unit_id, u.nome, u.uf, u.cidade, u.atualizado_em,
-            (SELECT count(*) FROM pessoas p WHERE p.unit_id=u.unit_id) AS pessoas
-       FROM unidades u ORDER BY u.nome NULLS LAST, u.unit_id`);
-  return r.rows;
+export async function nomePessoa(pessoaId) {
+  const r = await getPool().query("SELECT nome FROM pessoas WHERE id=$1", [pessoaId]);
+  return r.rows[0] ? r.rows[0].nome : null;
 }
 
-export async function salvarUnidade(unitId, { nome, uf, cidade }) {
-  const UF = uf ? String(uf).trim().toUpperCase() : null;
-  if (UF && !/^[A-Z]{2}$/.test(UF)) throw new ErroDb("invalid_argument", "UF inválida.");
+export async function painelAcessos() {
+  const [u, a, p] = await Promise.all([
+    getPool().query(`SELECT u.unit_id, u.nome, u.uf, u.cidade, (SELECT count(*) FROM acessos a WHERE a.unit_id=u.unit_id) AS pessoas
+                       FROM unidades u ORDER BY u.nome NULLS LAST, u.unit_id`),
+    getPool().query(`SELECT a.email, a.papel, a.unit_id, a.ativo, p.nome, p.perfil_cms, p.ultimo_login
+                       FROM acessos a LEFT JOIN pessoas p ON lower(p.email) = a.email ORDER BY a.papel, a.email`),
+    getPool().query(`SELECT p.email, p.nome, p.perfil_cms, p.ultimo_login FROM pessoas p
+                      WHERE p.email IS NOT NULL AND NOT EXISTS (SELECT 1 FROM acessos a WHERE a.email = lower(p.email))
+                      ORDER BY p.ultimo_login DESC NULLS LAST LIMIT 100`),
+  ]);
+  return { unidades: u.rows, acessos: a.rows, pendentes: p.rows };
+}
+
+function validarUnidade({ nome, uf, cidade }) {
+  const N = String(nome || "").trim(), UF = String(uf || "").trim().toUpperCase();
+  if (!N) throw new ErroDb("invalid_argument", "Informe o nome da unidade.");
+  if (!/^[A-Z]{2}$/.test(UF)) throw new ErroDb("invalid_argument", "UF inválida.");
+  return [N.slice(0, 120), UF, String(cidade || "").trim().slice(0, 120) || null];
+}
+export async function criarUnidade(dados) {
+  const [n, uf, c] = validarUnidade(dados);
+  const r = await getPool().query("INSERT INTO unidades(nome,uf,cidade) VALUES ($1,$2,$3) RETURNING unit_id", [n, uf, c]);
+  return { unit_id: r.rows[0].unit_id };
+}
+export async function salvarUnidade(unitId, dados) {
+  const [n, uf, c] = validarUnidade(dados);
+  const r = await getPool().query("UPDATE unidades SET nome=$2, uf=$3, cidade=$4, atualizado_em=now() WHERE unit_id=$1", [Number(unitId), n, uf, c]);
+  if (!r.rowCount) throw new ErroDb("not_found", "Unidade não encontrada.", 404);
+}
+
+export async function salvarAcesso(email, { papel, unit_id, ativo }, autor) {
+  const E = String(email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(E)) throw new ErroDb("invalid_argument", "E-mail inválido.");
+  if (!["franqueador", "master"].includes(papel)) throw new ErroDb("invalid_argument", "Papel inválido.");
+  const U = papel === "master" ? Number(unit_id) : null;
+  if (papel === "master") {
+    if (!U) throw new ErroDb("invalid_argument", "Escolha a unidade do master.");
+    const ex = await getPool().query("SELECT 1 FROM unidades WHERE unit_id=$1", [U]);
+    if (!ex.rowCount) throw new ErroDb("invalid_argument", "Unidade não encontrada.");
+  }
   await getPool().query(
-    `INSERT INTO unidades(unit_id,nome,uf,cidade,atualizado_em) VALUES ($1,$2,$3,$4,now())
-     ON CONFLICT (unit_id) DO UPDATE SET nome=EXCLUDED.nome, uf=EXCLUDED.uf, cidade=EXCLUDED.cidade, atualizado_em=now()`,
-    [Number(unitId), nome || null, UF, cidade || null]);
+    `INSERT INTO acessos(email,papel,unit_id,ativo,criado_por) VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (email) DO UPDATE SET papel=EXCLUDED.papel, unit_id=EXCLUDED.unit_id, ativo=EXCLUDED.ativo`,
+    [E, papel, U, ativo !== false, autor || null]);
+}
+export async function removerAcesso(email) {
+  await getPool().query("DELETE FROM acessos WHERE email=$1", [String(email || "").trim().toLowerCase()]);
+  await getPool().query("DELETE FROM sessoes WHERE lower(email)=$1", [String(email || "").trim().toLowerCase()]);
 }
 
 export async function perfis(ids) {

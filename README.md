@@ -16,10 +16,13 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 - **Todo o resto exige sessão.** Sem sessão:
   - páginas redirecionam para `/login`;
   - arquivos e API respondem `401`.
+- **Login** (API que está em produção no CMS, `docs/GUIA_INTEGRACAO_FRONT_API.md`), sempre feito pelo servidor, nunca pelo navegador:
+  - com `CMS_PASSWORD_SECRET`: login v2 `POST /v2/webbook/login`, com o payload `{email, password, type:"teacher"}` assinado (HS256) no servidor;
+  - sem essa chave: login v1 `GET /v1/authentication`, em HTTPS. A URL nunca vai para log.
 - **Sessão:**
-  - o token do CMS fica no cookie `gv_session` (`HttpOnly`, `Secure` em produção, `SameSite=Lax`, 24 h);
-  - o JavaScript da página nunca vê o token;
-  - cada requisição é validada em `GET /admin/auth/me` do CMS, com cache de 60 s;
+  - o navegador recebe só um id aleatório no cookie `gv_session` (`HttpOnly`, `Secure` em produção, `SameSite=Lax`, até 24 h);
+  - o token do CMS fica no banco (tabela `sessoes`); o JavaScript da página nunca o vê;
+  - o token é conferido no CMS em `GET /webbook/teacher/dashboard`, com cache de 60 s;
   - se o CMS estiver fora do ar e o cache vencido, a resposta é `503`: o acesso nunca é liberado por padrão.
 - **`public/claude-shim.js`** recria o `window.claude.use(...)` que o app usava dentro do Claude:
   - `user`: `id`, `isOwner`, `can`, `canEdit`, `profiles`;
@@ -30,17 +33,19 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
   Ele também limpa o cache local quando outra pessoa entra no mesmo navegador e mostra quem está logado, com o botão **Sair**.
 - A identidade chega ao front por `window.GV_SESSION`, que o servidor injeta no `index.html` a cada requisição. A mesma informação está em `GET /api/session`.
 
-## Papéis (decisão D2) · `server/roles.js`
+## Papéis (decisão D2) · `server/roles.js` e `/acessos`
 
-| CMS `role_id` | No GeoVenda | Acesso |
+A API de produção do CMS confirma e-mail e senha, mas **não informa papel nem unidade**. Por isso o GeoVenda guarda quem pode entrar:
+
+| Papel no GeoVenda | Como se define | Acesso |
 |---|---|---|
-| 1 · Franqueador | `master` | todos os estados, todas as unidades, edita os textos-base (Método, Top English), configura unidades em `/unidades` |
-| 2 · Master franqueado | `unidade` | só a UF da unidade (arquivos `data/` e `bairros/` de outras UFs dão `403`) e só o espaço do funil da unidade dele |
-| 3 · Professor | bloqueado | "Perfil sem acesso ao GeoVenda." |
-| outros, ou desativado | bloqueado pelo CMS | |
+| Franqueador | e-mail em `GV_FRANQUEADORES` (Railway) ou liberado como franqueador em `/acessos` | todos os estados e unidades; edita os textos-base (Método, Top English); libera acessos e cria unidades em `/acessos` |
+| Master | liberado em `/acessos`, sempre com uma unidade (nome, UF, cidade) | só a UF da unidade (arquivos `data/` e `bairros/` de outras UFs dão `403`) e só o funil da unidade |
+| Qualquer outro (inclusive professores) | não está em `/acessos` | bloqueado: "Seu acesso ao GeoVenda ainda não foi liberado." |
 
-- **Unidade sem UF:** o master vê "Sua unidade ainda não tem estado configurado" e não recebe dados até o franqueador preencher a UF em **`/unidades`** (de-para D3b).
-- **Preenchimento automático:** se o CMS mandar `unit.state`, o de-para é preenchido sozinho.
+- Quem tenta entrar sem acesso aparece em **Pessoas aguardando liberação**, em `/acessos`, com o perfil que o CMS informa. Basta clicar em **Liberar**.
+- Desativar ou remover um acesso derruba a sessão da pessoa na hora.
+- Usuário desativado no CMS não consegue mais entrar; a sessão aberta dura no máximo 24 h.
 
 ## Regras de dados · `server/db.js`
 
@@ -74,12 +79,7 @@ DATABASE_URL=postgres://localhost/geovenda CMS_BASE_URL=http://localhost:4000 np
 npm test                             # matriz de testes de acesso (com o servidor e o CMS falso no ar)
 ```
 
-Usuários do CMS falso:
-- `franqueador@teste.com` (role 1);
-- `master.rj@teste.com` (role 2, unidade com UF RJ);
-- `master@teste.com` (role 2, unidade sem UF);
-- `professor@teste.com` (role 3);
-- `desativado@teste.com`.
+Usuários do CMS falso (formato da API de produção): `franqueador@teste.com`, `master.rj@teste.com`, `master.novo@teste.com`, `professor@teste.com` e `desativado@teste.com`. Rode o servidor com `GV_FRANQUEADORES=franqueador@teste.com`. Para testar o login v2, use `CMS_PASSWORD_SECRET=segredo-de-teste`.
 
 Para testar a IA sem custo, rode `node server/dev/mock-anthropic.js` e use `ANTHROPIC_API_KEY=teste ANTHROPIC_API_URL=http://localhost:4100`.
 
@@ -91,6 +91,8 @@ Veja `.env.example`.
 |---|---|
 | `DATABASE_URL` | obrigatória |
 | `CMS_BASE_URL` | padrão `https://cms.topenglish.com.br` |
+| `GV_FRANQUEADORES` | e-mails de franqueador, separados por vírgula |
+| `CMS_PASSWORD_SECRET` | opcional: ativa o login v2 (senha só no corpo da requisição) |
 | `NODE_ENV` | `production` no Railway |
 | `PORT` | o Railway injeta |
 | `ANTHROPIC_API_KEY` | opcional: sem ela, a IA fica desligada |
@@ -104,6 +106,7 @@ Deploy automático no Railway a cada push na branch `main`. O healthcheck é `/h
 - **Sem refresh de sessão:** o token do CMS vale 24 h; depois disso, a pessoa faz login de novo.
 - **Nomes no painel da equipe:** só aparecem pessoas que já entraram ao menos uma vez.
 - **Fila de pedidos de relatório (Radar › Pedidos):** no Claude, uma rotina externa transformava pedidos em relatórios. Fora do Claude, os pedidos ficam na fila até essa rotina ser recriada no servidor.
-- **Usuário desativado:** confirmar com o time do CMS que `/admin/auth/me` recusa desativados. Se não recusar, a pessoa mantém o acesso até o token expirar (até 24 h).
+- **Usuário desativado no CMS:** confirmar com o time do CMS se `/webbook/teacher/dashboard` recusa tokens de desativados. Se não recusar, a pessoa mantém a sessão aberta até 24 h (ou até o franqueador desativá-la em `/acessos`).
+- **API `/admin`:** quando o CMS publicar o namespace `/admin` (`docs/INTEGRACAO_API_FRONT.md`), o papel e a unidade poderão vir do CMS em vez da tabela `acessos`.
 - **CSP:** ainda não foi aplicada, porque o `index.html` usa scripts inline.
 - **Bibliotecas por CDN:** jsPDF, SheetJS, ExcelJS, pdf.js e mammoth ainda vêm de CDN, com versão fixa.

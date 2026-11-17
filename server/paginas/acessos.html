@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GeoVenda · Acessos</title><link rel="stylesheet" href="/login/login.css">
+<style>
+body{display:block;place-items:normal}.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px;min-width:0}.card{max-width:none;min-width:0;overflow:hidden}
+h2{margin:0 0 4px;font-size:20px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}td input,td select{padding:7px 8px;width:100%}td input.uf,input.uf{text-transform:uppercase}
+.b{display:inline-block;border:0;border-radius:8px;padding:8px 12px;background:var(--acc);color:#fff;font:600 14px/1 inherit;cursor:pointer;white-space:nowrap}.b.g{background:transparent;color:var(--acc);border:1px solid var(--line)}.b.r{background:transparent;color:var(--bad);border:1px solid var(--line)}
+.tw{overflow-x:auto;max-width:100%}.st{font-size:13px;color:var(--muted)}.ok{color:#1F7A3E}.er{color:var(--bad)}
+.add{display:grid;grid-template-columns:2fr 70px 1.4fr auto;gap:8px;margin-top:10px}.add2{display:grid;grid-template-columns:2fr 1fr 1.6fr auto;gap:8px;margin-top:10px}
+.add input,.add select,.add2 input,.add2 select{padding:9px}
+@media(max-width:700px){.add,.add2{grid-template-columns:1fr}}
+</style></head>
+<body><div class="wrap">
+<main class="card">
+  <h1>Acessos ao GeoVenda</h1>
+  <p class="sub">O sistema da Top English confirma o e-mail e a senha. Aqui você decide quem entra no GeoVenda, com qual papel e em qual unidade. Quem não estiver na lista não entra, inclusive professores. <a href="/">Voltar ao GeoVenda</a></p>
+  <p class="st" id="msg" role="status"></p>
+</main>
+<section class="card">
+  <h2>Pessoas aguardando liberação</h2>
+  <p class="sub">Entraram com e-mail e senha da Top English, mas ainda não têm acesso ao GeoVenda.</p>
+  <div class="tw"><table><thead><tr><th>E-mail</th><th>Nome</th><th>Perfil no CMS</th><th>Última tentativa</th><th></th></tr></thead><tbody id="pend"></tbody></table></div>
+</section>
+<section class="card">
+  <h2>Pessoas com acesso</h2>
+  <div class="tw"><table><thead><tr><th>E-mail</th><th>Papel</th><th>Unidade</th><th>Ativo</th><th></th></tr></thead><tbody id="aces"></tbody></table></div>
+  <div class="add2"><input id="nEmail" type="email" placeholder="E-mail da pessoa no sistema da Top English"><select id="nPapel"><option value="master">Master</option><option value="franqueador">Franqueador</option></select><select id="nUnid"></select><button class="b" id="nAdd" type="button">Liberar acesso</button></div>
+</section>
+<section class="card">
+  <h2>Unidades</h2>
+  <p class="sub">O master só vê o estado (UF) e o funil da unidade dele.</p>
+  <div class="tw"><table><thead><tr><th>Unidade</th><th>UF</th><th>Cidade</th><th>Pessoas</th><th></th></tr></thead><tbody id="unis"></tbody></table></div>
+  <div class="add"><input id="uNome" placeholder="Nome da unidade (ex.: Top English Niterói)"><input id="uUf" class="uf" maxlength="2" placeholder="UF"><input id="uCid" placeholder="Cidade"><button class="b" id="uAdd" type="button">Criar unidade</button></div>
+</section>
+</div>
+<script>
+(function(){
+  const $=id=>document.getElementById(id), msg=$("msg");
+  const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const aviso=(t,ok)=>{msg.textContent=t;msg.className="st "+(ok?"ok":"er")};
+  const dt=v=>v?new Date(v).toLocaleString("pt-BR"):"—";
+  async function api(m,url,body){
+    const r=await fetch(url,{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+    if(r.status===401){location.href="/login?next=/acessos";throw new Error("login")}
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||"Erro");return j}
+  let D=null;
+  const opUnid=sel=>D.unidades.map(u=>`<option value="${u.unit_id}"${String(u.unit_id)===String(sel)?" selected":""}>${esc(u.nome)} · ${esc(u.uf||"")}</option>`).join("");
+  function render(){
+    $("nUnid").innerHTML=`<option value="">Unidade (para master)</option>`+opUnid("");
+    $("pend").innerHTML=D.pendentes.length?D.pendentes.map(p=>`<tr><td>${esc(p.email)}</td><td>${esc(p.nome)}</td><td>${esc(p.perfil_cms||"—")}</td><td>${dt(p.ultimo_login)}</td><td><button class="b g" data-lib="${esc(p.email)}">Liberar</button></td></tr>`).join(""):`<tr><td colspan="5" class="st">Ninguém aguardando.</td></tr>`;
+    $("aces").innerHTML=D.acessos.map(a=>{const fixo=D.fixos.includes(a.email);return `<tr data-e="${esc(a.email)}"><td>${esc(a.email)}${a.nome?`<br><span class="st">${esc(a.nome)}${a.perfil_cms?" · CMS: "+esc(a.perfil_cms):""}</span>`:""}${fixo?'<br><span class="st">definido no Railway</span>':""}</td>
+      <td><select class="pa"${fixo?" disabled":""}><option value="master"${a.papel==="master"?" selected":""}>Master</option><option value="franqueador"${a.papel==="franqueador"?" selected":""}>Franqueador</option></select></td>
+      <td><select class="un"><option value="">—</option>${opUnid(a.unit_id)}</select></td>
+      <td><input type="checkbox" class="at"${a.ativo?" checked":""}${fixo?" disabled":""} style="width:auto"></td>
+      <td><button class="b g sv">Salvar</button> ${a.email===D.eu||fixo?"":'<button class="b r rm">Remover</button>'}</td></tr>`}).join("")||`<tr><td colspan="5" class="st">Nenhum acesso liberado ainda.</td></tr>`;
+    $("unis").innerHTML=D.unidades.map(u=>`<tr data-u="${u.unit_id}"><td><input class="n" value="${esc(u.nome)}"></td><td><input class="uf" maxlength="2" value="${esc(u.uf)}" style="width:64px"></td><td><input class="c" value="${esc(u.cidade)}"></td><td>${u.pessoas}</td><td><button class="b g su">Salvar</button></td></tr>`).join("")||`<tr><td colspan="5" class="st">Nenhuma unidade ainda. Crie abaixo.</td></tr>`;
+  }
+  async function carregar(){D=await api("GET","/api/acessos");render()}
+  document.addEventListener("click",async e=>{const t=e.target;try{
+    if(t.dataset.lib){$("nEmail").value=t.dataset.lib;$("nEmail").scrollIntoView({behavior:"smooth",block:"center"});$("nUnid").focus();return}
+    if(t.id==="nAdd"){const papel=$("nPapel").value;await api("PUT","/api/acessos/"+encodeURIComponent($("nEmail").value.trim()),{papel,unit_id:papel==="master"?$("nUnid").value:null,ativo:true});$("nEmail").value="";aviso("Acesso liberado.",true);await carregar();return}
+    if(t.id==="uAdd"){await api("POST","/api/unidades",{nome:$("uNome").value,uf:$("uUf").value,cidade:$("uCid").value});["uNome","uUf","uCid"].forEach(i=>$(i).value="");aviso("Unidade criada.",true);await carregar();return}
+    const tr=t.closest("tr");
+    if(t.classList.contains("sv")){const papel=tr.querySelector(".pa").value;await api("PUT","/api/acessos/"+encodeURIComponent(tr.dataset.e),{papel,unit_id:tr.querySelector(".un").value||null,ativo:tr.querySelector(".at").checked});aviso("Acesso salvo.",true);await carregar()}
+    if(t.classList.contains("rm")){if(t.dataset.ok!=="1"){t.dataset.ok="1";t.textContent="Confirmar";return}await api("DELETE","/api/acessos/"+encodeURIComponent(tr.dataset.e));aviso("Acesso removido.",true);await carregar()}
+    if(t.classList.contains("su")){await api("PUT","/api/unidades/"+tr.dataset.u,{nome:tr.querySelector(".n").value,uf:tr.querySelector(".uf").value,cidade:tr.querySelector(".c").value});aviso("Unidade salva.",true);await carregar()}
+  }catch(x){if(x.message!=="login")aviso(x.message,false)}});
+  $("nPapel").onchange=()=>{$("nUnid").disabled=$("nPapel").value!=="master"};
+  carregar().catch(x=>aviso(x.message,false));
+})();
+</script></body></html>

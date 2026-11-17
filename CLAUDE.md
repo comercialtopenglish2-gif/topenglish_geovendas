@@ -26,13 +26,13 @@ Após CADA alteração concluída e testada neste projeto:
 ## Regras de autenticação (obrigatórias)
 - TODO o sistema exige login. Nenhuma rota nova pode ser pública, exceto `/healthz`, `/login`, `/auth/login` e `/auth/logout`.
 - O servidor só serve arquivos de `public/` (e `login/` na parte pública). Nunca servir a raiz do projeto.
-- A autenticação é a do Top English CMS (`docs/INTEGRACAO_API_FRONT.md`): `POST /admin/auth/login` e validação por `GET /admin/auth/me`. NUNCA usar as rotas legadas `/v1/authentication` e `/v2/webbook/login`.
-- O token fica em cookie `HttpOnly`; nunca em `localStorage`, nunca em query string, nunca exposto ao JavaScript do front.
-- NUNCA decidir permissão decodificando o JWT. O papel vem do `/me` (via `/api/session`).
-- Permissões por `role_id` vivem SOMENTE em `server/roles.js`. Papel desconhecido = bloqueado (falha fechada). CMS indisponível sem cache válido = bloqueado.
+- A autenticação é a da API que está EM PRODUÇÃO no Top English CMS (`docs/GUIA_INTEGRACAO_FRONT_API.md`, decisão da usuária em 17/11/2026): login v2 `POST /v2/webbook/login` com payload assinado no servidor (`CMS_PASSWORD_SECRET`) e, sem essa chave, login v1 `GET /v1/authentication` chamado só servidor-a-servidor. A validação contínua é `GET /webbook/teacher/dashboard` com Bearer. Nunca chamar essas rotas a partir do navegador, nunca registrar em log a URL do login v1. O namespace `/admin` (`docs/INTEGRACAO_API_FRONT.md`) ainda não existe em produção.
+- O navegador recebe só um id de sessão aleatório em cookie `HttpOnly`. O token do CMS fica na tabela `sessoes`, no servidor; nunca em `localStorage`, nunca em query string, nunca exposto ao JavaScript do front.
+- NUNCA decidir permissão decodificando o JWT. A API de produção não informa papel nem unidade: o papel vem da tabela `acessos` do GeoVenda (editada pelo franqueador em `/acessos`) e de `GV_FRANQUEADORES`, via `/api/session`.
+- Permissões por papel vivem SOMENTE em `server/roles.js`. Quem não está em `acessos` = bloqueado (falha fechada), inclusive professores. CMS indisponível sem cache válido = bloqueado.
 - Regras de acesso a dados são aplicadas NO SERVIDOR (`server/db.js`), não só no front.
-- `role_id 2` fica preso à unidade dele; só `role_id 1` escolhe unidade. Em `403` do CMS, não tentar de novo com outro `X-Active-Unit-Id`.
-- Qualquer mudança em `server/auth.js`, `server/roles.js`, `server/db.js` ou no portão do `index.html` exige: confirmação do usuário, rodar a matriz de testes do README e commit com prefixo `sec:`.
+- O master fica preso à unidade dele (definida em `acessos`); só o franqueador vê todas. Não existe header de unidade na API de produção do CMS.
+- Qualquer mudança em `server/auth.js`, `server/roles.js`, `server/db.js`, `server/paginas/acessos.html` ou no portão do `index.html` exige: confirmação do usuário, rodar a matriz de testes do README e commit com prefixo `sec:`.
 
 ## Checagem antes de commitar
 - Rodar localmente com o CMS falso (`server/dev/mock-cms.js`) e a matriz `npm test` (`server/dev/test-matrix.js`): sem login nada abre; cada papel vê só o que pode; sem erros novos no console.
@@ -46,5 +46,5 @@ Após CADA alteração concluída e testada neste projeto:
 
 ## Particularidades deste projeto
 - `public/index.html` não carrega o shim sozinho: o servidor injeta `window.GV_SESSION` e `<script src="claude-shim.js">` logo após `<head>` a cada requisição (`server/server.js`, função `indexComSessao`).
-- O de-para de unidades (UF/cidade) é editado pelo franqueador em `/unidades`.
-- `role_id 2` só recebe `data/<UF>.json` e `bairros/<UF>.json` da UF da própria unidade (regra no `server/server.js`).
+- Unidades (nome/UF/cidade) e acessos (e-mail, papel, unidade) são editados pelo franqueador em `/acessos` (`server/paginas/acessos.html`).
+- O master só recebe `data/<UF>.json` e `bairros/<UF>.json` da UF da própria unidade (regra no `server/server.js`).
