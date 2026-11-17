@@ -71,7 +71,7 @@ const db = (cookie, op, body) => req("/api/db/" + op, { cookie, method: "POST", 
   await db(f.cookie, "set", { path: "data/users/cms-1/fu-teste", data: { nome: "lead do franqueador" } });
   const alheio = await db(rj.cookie, "get", { path: "data/users/cms-1/fu-teste" });
   ok("usuário A não lê privado de B", alheio.status === 403, String(alheio.status));
-  const proprio = await db(rj.cookie, "set", { path: "data/users/cms-11/fu-1", data: { nome: "Lead RJ", status: "andamento" } });
+  const proprio = await db(rj.cookie, "set", { path: "data/users/cms-11/fu-1", data: { id: "fu-1", nome: "Lead RJ", status: "andamento", passos: [], historico: [], criado: new Date().toISOString() } });
   const lido = await db(rj.cookie, "get", { path: "data/users/cms-11/fu-1" });
   ok("usuário grava e lê o próprio", proprio.status === 200 && lido.json && lido.json.data.nome === "Lead RJ");
   const cfg = await db(rj.cookie, "set", { path: "config/calibracao", data: { x: 1 } });

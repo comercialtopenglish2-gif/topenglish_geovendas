@@ -743,12 +743,13 @@ const S={ uf:"MG", data:null, cache:{}, bcache:{}, bairros:null, age:new Set(PRE
   db:null, sample:null, downloads:null, pedidos:[], relatorios:[], palavras:[], kw:null, kwBusy:false, fontesDb:{}, fontesMeta:null, calib:null, view:"radar", cmpLevel:"mun", monitores:[], horarios:[], proprios:[] };
 
 try{ const v=JSON.parse(localStorage.getItem("radar_prefs")||"null"); if(v){ Object.assign(S,{uf:v.uf||S.uf}); if(v.preset){ const p=PRESETS.find(x=>x.id===v.preset); if(p){S.preset=p;} } if(v.cls) S.cls=new Set(v.cls); if(v.age) S.age=new Set(v.age); ["ticket","pct","minPub"].forEach(k=>{ if(typeof v[k]==="number") S[k]=v[k]; }); } }catch(e){}
+const GV_UF_TRAVADA=(window.GV_SESSION&&!window.GV_SESSION.master&&window.GV_SESSION.unidade&&window.GV_SESSION.unidade.uf)||null; if(GV_UF_TRAVADA) S.uf=GV_UF_TRAVADA; // master: só a UF da unidade
 const DR={uf:S.uf,preset:S.preset,cls:new Set(S.cls),age:new Set(S.age),ticket:S.ticket,pct:S.pct,minPub:S.minPub};
 function savePrefs(){ try{ localStorage.setItem("radar_prefs",JSON.stringify({uf:S.uf,preset:S.preset.id,cls:[...S.cls],age:[...S.age],ticket:S.ticket,pct:S.pct,minPub:S.minPub})); }catch(e){} }
 
 /* ---------------- controls ---------------- */
 function initControls(){
-  const u=$("#uf"); UFS.forEach(([s,n])=>{ const o=el("option",null,n+" ("+s+")"); o.value=s; u.appendChild(o); }); u.value=S.uf;
+  const u=$("#uf"); UFS.forEach(([s,n])=>{ const o=el("option",null,n+" ("+s+")"); o.value=s; u.appendChild(o); }); u.value=S.uf; if(GV_UF_TRAVADA){ u.disabled=true; u.title="Estado da sua unidade"; }
   u.onchange=()=>{ DR.uf=u.value; applyChanges(); };
   const p=$("#prod"); PRESETS.forEach(x=>{ const o=el("option",null,x.label); o.value=x.id; p.appendChild(o); }); p.value=S.preset.id;
   p.onchange=()=>{ const pr=PRESETS.find(x=>x.id===p.value); DR.preset=pr; DR.cls=new Set(pr.cls); DR.age=new Set(pr.age); DR.ticket=pr.ticket; DR.pct=pr.pct; DR.minPub=pr.min; syncInputs(); applyChanges(); };
@@ -7681,7 +7682,7 @@ render();
   try{ const cw=user&&user.can?await user.can("data.write"):null; if(cw===false) S.readonly=true; }catch(e){}
   S.isOwner=user?await user.isOwner().catch(()=>false):false;
   if(!S.uid){S.noId=true;S.ready=true;render();return}
-  S.space=S.uid;
+  S.space=(window.GV_SESSION&&window.GV_SESSION.espaco)||S.uid; // GeoVenda no servidor: espaço = unidade do CMS
   if(S.isOwner){db.collection("escolas").onSnapshot(s=>{S.spaces=s.docs.map(d=>({id:d.id,...clone(d.data())})).sort((a,b)=>String((a.escolas||[])[0]||"").localeCompare(String((b.escolas||[])[0]||""),"pt-BR"));renderChrome()},()=>{})}
   subSpace();
  } else { loadLocal();S.ready=true;localRefresh(); }
