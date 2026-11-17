@@ -1,0 +1,22 @@
+{
+  "name": "geovenda",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GeoVenda · Processos Comerciais e Inteligência de praça para vender mais",
+  "main": "server/server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "NODE_ENV=development node server/server.js",
+    "mock-cms": "node server/dev/mock-cms.js",
+    "test": "node server/dev/test-matrix.js"
+  },
+  "dependencies": {
+    "compression": "1.7.5",
+    "express": "4.21.2",
+    "pg": "8.13.1"
+  }
+}

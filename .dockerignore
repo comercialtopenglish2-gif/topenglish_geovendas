@@ -1,0 +1,8 @@
+.git
+node_modules
+*.md
+.env
+.env.*
+server/dev
+.pgdata
+tmp
