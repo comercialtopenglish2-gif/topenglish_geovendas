@@ -93,6 +93,27 @@ const api = (cookie, method, caminho, body) => req(caminho, { cookie, method, bo
   ok("coleção desconhecida bloqueada", (await db(f.cookie, "get", { path: "segredos/x" })).status === 403);
   ok("documento grande: quota_exceeded", ((await db(rj.cookie, "set", { path: "data/users/cms-11/big", data: { x: "a".repeat(1000 * 1024) } })).json || {}).code === "quota_exceeded");
 
+  // 7b. campanhas e brindes
+  const pc = await req("/campanhas", { cookie: rj.cookie });
+  ok("campanhas abre com sessão e shim", pc.status === 200 && pc.txt.includes("window.GV_SESSION=") && pc.txt.includes("GV_CAMP_RESUMO"));
+  ok("campanhas exige login", (await req("/campanhas")).status === 302 && (await req("/campanhas.html", { accept: "application/json" })).status === 401);
+  ok("campanha migrada aparece", ((await db(rj.cookie, "list", { path: "campanhas" })).json || {}).docs?.some(d => d.id === "black-friday-2026"));
+  ok("master não cria campanha", (await db(rj.cookie, "set", { path: "campanhas/x", data: { nome: "X" } })).status === 403);
+  ok("franqueador cria campanha", (await db(f.cookie, "set", { path: "campanhas/natal", data: { nome: "Natal", inicio: "2026-12-01", fim: "2026-12-24" } })).status === 200);
+  await req("/campanhas", { cookie: f.cookie });
+  const unis = (await db(rj.cookie, "list", { path: "unidades" })).json;
+  ok("master vê só a unidade dele em campanhas", unis.docs.length === 1 && unis.docs[0].id === "u7", JSON.stringify(unis.docs.map(d => d.id)));
+  ok("franqueador vê as unidades da rede", ((await db(f.cookie, "list", { path: "unidades" })).json.docs || []).length >= 2);
+  ok("master lança aluno da unidade dele", (await db(rj.cookie, "set", { path: "participacoes/p1", data: { campanhaId: "black-friday-2026", aluno: "Ana", unidadeId: "u7", tipo: "Matrícula", data: "2026-11-10" } })).status === 200);
+  ok("master não lança para outra unidade", (await db(rj.cookie, "set", { path: "participacoes/p2", data: { campanhaId: "black-friday-2026", aluno: "Bia", unidadeId: "u1" } })).status === 403);
+  await db(f.cookie, "set", { path: "participacoes/p3", data: { campanhaId: "black-friday-2026", aluno: "Caio", unidadeId: "u1" } });
+  const lp = (await db(rj.cookie, "list", { path: "participacoes" })).json;
+  ok("master só lista os alunos da unidade dele", lp.docs.length === 1 && lp.docs[0].id === "p1", lp.docs.map(d => d.id).join(","));
+  ok("master não lê nem apaga aluno de outra unidade", (await db(rj.cookie, "get", { path: "participacoes/p3" })).status === 403 && (await db(rj.cookie, "delete", { path: "participacoes/p3" })).status === 403);
+  ok("master não move aluno de outra unidade para a dele", (await db(rj.cookie, "set", { path: "participacoes/p3", data: { aluno: "Caio", unidadeId: "u7" } })).status === 403);
+  ok("master não mexe no estoque", (await db(rj.cookie, "set", { path: "estoque/e1", data: { campanhaId: "black-friday-2026", unidadeId: "u7", recebidas: 99 } })).status === 403);
+  ok("franqueador lança estoque e master lê o dele", (await db(f.cookie, "set", { path: "estoque/e1", data: { campanhaId: "black-friday-2026", unidadeId: "u7", recebidas: 50 } })).status === 200 && ((await db(rj.cookie, "list", { path: "estoque" })).json.docs || []).length === 1);
+
   // 8. cookie falso e logout
   ok("cookie falso volta ao login", (await req("/", { cookie: "gv_session=" + "a".repeat(64) })).status === 302);
   ok("token do CMS no cookie não é aceito", (await req("/", { cookie: "gv_session=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxfQ.x" })).status === 302);

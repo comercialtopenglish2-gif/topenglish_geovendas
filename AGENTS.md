@@ -51,3 +51,4 @@ Após CADA alteração concluída e testada neste projeto:
 - `public/index.html` não carrega o shim sozinho: o servidor injeta `window.GV_SESSION` e `<script src="claude-shim.js">` logo após `<head>` a cada requisição (`server/server.js`, função `indexComSessao`).
 - Em `/acessos` (`server/paginas/acessos.html`) o franqueador corrige UF e cidade das unidades (modo `admin`: o CMS manda o estado por extenso, convertido em sigla por `ufDe` em `server/roles.js`) e, no modo `legado`, também libera pessoas.
 - O master só recebe `data/<UF>.json` e `bairros/<UF>.json` da UF da própria unidade (regra no `server/server.js`).
+- Campanhas e brindes é a página `public/campanhas.html`, servida em `/campanhas` com a mesma injeção de sessão e aberta num iframe em Medir (`#view-camp` no `index.html`). As regras por unidade (`unidades`, `participacoes`, `estoque`, dono = `u<unit_id>`) ficam em `server/db.js`. O `X-Frame-Options` é `SAMEORIGIN` por causa desse iframe.

@@ -221,7 +221,7 @@
 
   // ---------- quem está logado + Sair (injetado na barra lateral) ----------
   function barraConta() {
-    if (document.getElementById("gvConta")) return;
+    if (document.getElementById("gvConta") || !document.getElementById("gvSide")) return; // só na tela principal
     var alvo = document.getElementById("gvSide") || document.body, antes = alvo.querySelector(".gv-theme");
     var d = document.createElement("div");
     d.id = "gvConta";

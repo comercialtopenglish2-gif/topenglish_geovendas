@@ -25,7 +25,8 @@ app.use((req, res, next) => {
   res.set({
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "X-Frame-Options": "DENY",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Security-Policy": "frame-ancestors 'self'",
   });
   if (PROD) res.set("Strict-Transport-Security", "max-age=31536000");
   next();
@@ -197,15 +198,21 @@ app.get(["/acessos", "/unidades"], (req, res) => {
 app.use("/api", (req, res) => res.status(404).json({ code: "not_found", message: "Rota inexistente." }));
 
 // ---------- app (só public/) ----------
-let indexCache = null;
-function indexComSessao(id) {
-  if (!indexCache || !PROD) indexCache = fs.readFileSync(path.join(PUBLIC, "index.html"), "utf8");
+const paginasCache = {};
+function paginaComSessao(arquivo, id) {
+  if (!paginasCache[arquivo] || !PROD) paginasCache[arquivo] = fs.readFileSync(path.join(PUBLIC, arquivo), "utf8");
   const sess = JSON.stringify(sessaoPublica(id)).replace(/</g, "\\u003c");
-  const inj = `<head>\n<script>window.GV_SESSION=${sess};</script>\n<script src="claude-shim.js"></script>`;
-  return indexCache.replace(/<head>/i, inj);
+  const inj = `<head>\n<script>window.GV_SESSION=${sess};</script>\n<script src="/claude-shim.js"></script>`;
+  return paginasCache[arquivo].replace(/<head>/i, inj);
 }
+const indexComSessao = id => paginaComSessao("index.html", id);
 app.get(["/", "/index.html"], (req, res) => {
   res.set({ "Cache-Control": "private, no-store", "Content-Type": "text/html; charset=utf-8" }).send(indexComSessao(req.gv));
+});
+// Campanhas e brindes (aberta dentro do GeoVenda, em Medir)
+app.get(["/campanhas", "/campanhas.html"], async (req, res) => {
+  try { await db.garantirUnidadesCampanha(req.gv); } catch (e) { console.error("garantirUnidadesCampanha falhou:", e.message); }
+  res.set({ "Cache-Control": "private, no-store", "Content-Type": "text/html; charset=utf-8" }).send(paginaComSessao("campanhas.html", req.gv));
 });
 // D2: master (role 2) só recebe os dados da UF da unidade dele; franqueador recebe todas
 app.get(/^\/(data|bairros)\/([A-Z]{2})\.json$/, (req, res, next) => {
