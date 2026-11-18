@@ -160,6 +160,7 @@ dialog::backdrop{background:rgba(0,20,50,.45)}
         <div id="pChart"></div></div>
       <div class="panel"><h3>Fora da regra</h3><p class="sub">Lançamentos que não ganham caixa e o motivo</p><div id="pOut"></div></div>
     </div>
+    <div class="panel"><h3>De onde vieram os leads</h3><p class="sub">Alunos com direito ao brinde, pela origem do lead</p><div class="tablewrap" id="pFontes"></div></div>
     <div class="panel"><h3>Por unidade</h3><div class="tablewrap" id="pUnits"></div></div>
   </section>
 
@@ -168,7 +169,7 @@ dialog::backdrop{background:rgba(0,20,50,.45)}
     <div class="headline"><div><h2>Alunos e entregas</h2><p id="aSub"></p></div>
       <div class="toolbar"><button class="btn" id="aExport">Exportar CSV</button><button class="btn w" id="aAdd">+ Lançar aluno</button><button class="btn pri w" id="aImp">Importar planilha</button></div></div>
     <div class="toolbar">
-      <input type="search" id="fSearch" class="grow" placeholder="Buscar aluno, código, grupo ou turma">
+      <input type="search" id="fSearch" class="grow" placeholder="Buscar aluno, código, grupo, turma ou origem">
       <select id="fStatus" aria-label="Situação">
         <option value="">Todas as situações</option><option value="pend">Com direito · a entregar</option><option value="ent">Entregues</option><option value="eleg">Com direito (todos)</option><option value="fora">Fora da regra</option>
       </select>
@@ -259,6 +260,9 @@ const MASTER_UNIT = GVS && GVS.campEscopo && GVS.campEscopo !== 'rede' ? GVS.cam
 if (MASTER_UNIT) document.documentElement.classList.add('gvmaster');
 const S = { camps: {}, units: {}, parts: {}, stock: {}, loaded: { c: false, u: false, p: false, s: false }, db: null, user: null, uid: null, canWrite: true, campId: LS.get('camp', ''), unitId: MASTER_UNIT || LS.get('unit', ''), view: 'painel', sel: new Set() };
 const TIPOS = ['Matrícula', 'Grupo aberto'];
+// de onde veio o lead (mesma lista de canais do GeoVenda)
+const FONTES = ['Instagram', 'Facebook', 'Google', 'WhatsApp', 'Site', 'Indicação', 'Aluno ou ex-aluno', 'Ação na rua / panfletagem', 'Evento', 'Parceria', 'Passou na frente da escola', 'Outro'];
+function fonteDe(v) { const t = norm(v); if (!t) return ''; const f = FONTES.find(x => norm(x) === t || t.includes(norm(x).split(' ')[0])); return f || String(v).trim(); }
 
 /* ---------- regra da campanha ---------- */
 function campStatus(c) { const t = today(); if (!c.inicio || !c.fim) return ['Sem período', 'mute']; if (t < c.inicio) return ['Agendada', 'info']; if (t > c.fim) return ['Encerrada', 'mute']; return ['Em andamento', 'ok']; }
@@ -442,7 +446,8 @@ function kpi(l, v, s, alert) { return el('div', { class: 'kpi' + (alert ? ' aler
 
 function rPainel() {
   const c = currentCamp();
-  if (!c) { $('#pTitle').textContent = 'Painel'; $('#pSub').textContent = ''; $('#pRule').replaceChildren(); $('#pKpis').replaceChildren(); noCamp($('#pUnits')); $('#pChart').replaceChildren(); $('#pOut').replaceChildren(); return; }
+  if (!c) { $('#pFontes').replaceChildren();
+    $('#pTitle').textContent = 'Painel'; $('#pSub').textContent = ''; $('#pRule').replaceChildren(); $('#pKpis').replaceChildren(); noCamp($('#pUnits')); $('#pChart').replaceChildren(); $('#pOut').replaceChildren(); return; }
   const { m } = metrics(c, S.unitId);
   $('#pTitle').textContent = c.nome;
   const rest = c.fim && today() <= c.fim && today() >= (c.inicio || '') ? daysBetween(today(), c.fim) : null;
@@ -460,6 +465,11 @@ function rPainel() {
   // fora da regra
   const out = Object.entries(m.motivos).sort((a, b) => b[1] - a[1]);
   $('#pOut').replaceChildren(out.length ? el('table', {}, el('tbody', {}, out.map(([k, v]) => el('tr', {}, el('td', {}, el('span', { class: 'chip bad', text: k })), el('td', { class: 'n', text: nf.format(v) }))))) : el('div', { class: 'empty' }, el('b', { text: 'Tudo dentro da regra' }), 'Nenhum lançamento ficou de fora.'));
+  // de onde vieram os leads (só alunos com direito)
+  { const { ev } = metrics(c); const cont = {}; let tot = 0;
+    for (const p of partsOf(c.id)) { if (S.unitId && p.unidadeId !== S.unitId) continue; if (!(ev.get(p.id) || {}).ok) continue; const k = p.fonteLead || 'Não informado'; cont[k] = (cont[k] || 0) + 1; tot++; }
+    const lin = Object.entries(cont).sort((a, b) => b[1] - a[1]);
+    $('#pFontes').replaceChildren(lin.length ? el('table', {}, el('tbody', {}, lin.map(([k, v]) => el('tr', {}, el('td', { text: k }), el('td', { class: 'n', text: nf.format(v) }), el('td', { class: 'n', text: pct(v / tot) }))))) : el('div', { class: 'empty' }, el('b', { text: 'Sem alunos com direito ainda' }), 'A origem aparece aqui conforme os alunos forem lançados.')); }
   // por unidade
   const units = S.unitId ? [S.units[S.unitId]].filter(Boolean) : unitList();
   const ids = new Set(units.map(u => u.id)); for (const p of partsOf(c.id)) if (!S.unitId && !ids.has(p.unidadeId)) { ids.add(p.unidadeId); units.push({ id: p.unidadeId, nome: unitName(p.unidadeId) }); }
@@ -501,7 +511,7 @@ function rAlunos() {
   const { ev } = metrics(c);
   let rows = partsOf(c.id); if (S.unitId) rows = rows.filter(p => p.unidadeId === S.unitId);
   const q = norm($('#fSearch').value), st = $('#fStatus').value, tp = $('#fTipo').value;
-  rows = rows.filter(p => { const e = ev.get(p.id) || {}; if (tp && p.tipo !== tp) return false; if (st === 'pend' && !(e.ok && !p.entregue)) return false; if (st === 'ent' && !(e.ok && p.entregue)) return false; if (st === 'eleg' && !e.ok) return false; if (st === 'fora' && e.ok) return false; if (q && !norm([p.aluno, p.codigo, p.grupo, p.turmaId, unitName(p.unidadeId)].join(' ')).includes(q)) return false; return true; })
+  rows = rows.filter(p => { const e = ev.get(p.id) || {}; if (tp && p.tipo !== tp) return false; if (st === 'pend' && !(e.ok && !p.entregue)) return false; if (st === 'ent' && !(e.ok && p.entregue)) return false; if (st === 'eleg' && !e.ok) return false; if (st === 'fora' && e.ok) return false; if (q && !norm([p.aluno, p.codigo, p.grupo, p.turmaId, p.fonteLead, unitName(p.unidadeId)].join(' ')).includes(q)) return false; return true; })
     .sort((a, b) => (b.data || '').localeCompare(a.data || '') || (a.aluno || '').localeCompare(b.aluno || '', 'pt-BR'));
   $('#aSub').textContent = `${c.nome} · ${S.unitId ? unitName(S.unitId) : 'rede toda'} · ${nf.format(rows.length)} lançamento${rows.length === 1 ? '' : 's'} na lista`;
   for (const id of [...S.sel]) if (!rows.find(r => r.id === id)) S.sel.delete(id);
@@ -512,7 +522,7 @@ function rAlunos() {
   box.replaceChildren(el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, all), ...['Aluno', 'Código', 'Tipo', 'Data', 'Início das aulas', 'Turma', 'Unidade', 'Situação', 'Entrega', ''].map(h => el('th', { text: h })))),
     el('tbody', {}, shown.map(p => { const e = ev.get(p.id) || {};
       const cb = e.ok && !p.entregue ? el('input', { type: 'checkbox', class: 'w', 'aria-label': 'Selecionar ' + p.aluno, checked: S.sel.has(p.id), onchange: ev2 => { ev2.target.checked ? S.sel.add(p.id) : S.sel.delete(p.id); $('#aBulk').disabled = !S.sel.size; $('#aBulk').textContent = S.sel.size ? `Marcar ${S.sel.size} como entregue${S.sel.size > 1 ? 's' : ''}` : 'Marcar selecionados como entregues'; } }) : null;
-      return el('tr', {}, el('td', {}, cb), el('td', {}, el('div', { text: p.aluno || '—', style: 'font-weight:600' }), p.grupo ? el('div', { class: 'why', text: 'Grupo: ' + p.grupo }) : null),
+      return el('tr', {}, el('td', {}, cb), el('td', {}, el('div', { text: p.aluno || '—', style: 'font-weight:600' }), el('div', { class: 'why', text: 'Veio de: ' + (p.fonteLead || 'não informado') }), p.grupo ? el('div', { class: 'why', text: 'Grupo: ' + p.grupo }) : null),
         el('td', { text: p.codigo || '—' }), el('td', { text: p.tipo || '—' }), el('td', { class: 'n', text: fmtD(p.data) }), el('td', { class: 'n' }, p.inicioAulas ? fmtD(p.inicioAulas) : el('span', { class: 'chip warn', text: 'falta' })), el('td' , {}, p.turmaId ? el('span', { text: p.turmaId }) : el('span', { class: 'chip warn', text: 'falta' })), el('td', { text: unitName(p.unidadeId) }),
         el('td', {}, e.ok ? el('span', { class: 'chip ok', text: 'Com direito' }) : el('span', { class: 'chip bad', text: e.motivo || '—' }), !p.noSistema ? el('div', { class: 'why', text: 'fora do sistema' }) : null),
         el('td', {}, !e.ok ? el('span', { class: 'chip mute', text: 'Não se aplica' }) : p.entregue ? el('div', {}, el('span', { class: 'chip ok', text: 'Entregue ' + fmtD(p.dataEntrega) }), p.recebidoPor ? el('div', { class: 'why', text: 'Recebeu: ' + p.recebidoPor }) : null) : el('button', { class: 'btn sm gold w', type: 'button', onclick: () => deliverDlg([p.id]), text: 'Entregar' })),
@@ -624,19 +634,19 @@ function unitDlg(u) {
 function partDlg(p) {
   const c = currentCamp(); if (!c) return toast('Crie uma campanha antes.', true);
   if (!unitList().length) return toast('Cadastre uma unidade antes de lançar alunos.', true);
-  const isNew = !p; p = p || { aluno: '', codigo: '', tipo: 'Matrícula', data: today() <= (c.fim || today()) ? today() : c.fim, unidadeId: S.unitId, grupo: '', inicioAulas: '', turmaId: '', noSistema: false, obs: '' };
-  const f = { aluno: el('input', { type: 'text', id: 'p-aluno', value: p.aluno }), codigo: el('input', { type: 'text', id: 'p-cod', value: p.codigo || '', placeholder: 'Nº da matrícula no sistema' }), tipo: el('select', { id: 'p-tipo' }, TIPOS.map(t => el('option', { text: t }))), data: el('input', { type: 'date', id: 'p-data', value: p.data || '' }), unid: unitSelect(p.unidadeId, 'p-unid'), grupo: el('input', { type: 'text', id: 'p-grupo', value: p.grupo || '', placeholder: 'Nome ou código do grupo' }), inicio: el('input', { type: 'date', id: 'p-inicio', value: p.inicioAulas || '' }), turma: el('input', { type: 'text', id: 'p-turma', value: p.turmaId || '', placeholder: 'Nº da turma no sistema' }), sis: el('input', { type: 'checkbox', id: 'p-sis', checked: !!p.noSistema }), obs: el('input', { type: 'text', id: 'p-obs', value: p.obs || '' }) };
-  f.tipo.value = p.tipo || 'Matrícula';
+  const isNew = !p; p = p || { aluno: '', codigo: '', tipo: 'Matrícula', data: today() <= (c.fim || today()) ? today() : c.fim, unidadeId: S.unitId, grupo: '', inicioAulas: '', turmaId: '', fonteLead: '', noSistema: false, obs: '' };
+  const f = { aluno: el('input', { type: 'text', id: 'p-aluno', value: p.aluno }), codigo: el('input', { type: 'text', id: 'p-cod', value: p.codigo || '', placeholder: 'Nº da matrícula no sistema' }), tipo: el('select', { id: 'p-tipo' }, TIPOS.map(t => el('option', { text: t }))), data: el('input', { type: 'date', id: 'p-data', value: p.data || '' }), unid: unitSelect(p.unidadeId, 'p-unid'), grupo: el('input', { type: 'text', id: 'p-grupo', value: p.grupo || '', placeholder: 'Nome ou código do grupo' }), inicio: el('input', { type: 'date', id: 'p-inicio', value: p.inicioAulas || '' }), turma: el('input', { type: 'text', id: 'p-turma', value: p.turmaId || '', placeholder: 'Nº da turma no sistema' }), fonte: el('select', { id: 'p-fonte' }, [el('option', { value: '', text: 'Escolha' }), ...[...new Set([...FONTES, ...(p.fonteLead && !FONTES.includes(p.fonteLead) ? [p.fonteLead] : [])])].map(t => el('option', { value: t, text: t }))]), sis: el('input', { type: 'checkbox', id: 'p-sis', checked: !!p.noSistema }), obs: el('input', { type: 'text', id: 'p-obs', value: p.obs || '' }) };
+  f.tipo.value = p.tipo || 'Matrícula'; f.fonte.value = p.fonteLead || '';
   const acts = [];
   if (!isNew) acts.push(el('button', { class: 'btn danger', type: 'button', text: 'Excluir', style: 'margin-right:auto', onclick: () => confirmDlg('Excluir lançamento', `Excluir ${p.aluno} desta campanha?`, 'Excluir', async () => { await delDoc('participacoes', p.id); toast('Lançamento excluído.'); }) }));
   if (!isNew && p.entregue) acts.push(el('button', { class: 'btn', type: 'button', text: 'Desfazer entrega', onclick: async () => { try { await updDoc('participacoes', p.id, { entregue: false, dataEntrega: '', recebidoPor: '' }); closeDlg(); toast('Entrega desfeita.'); } catch (e) {} } }));
   acts.push(el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: closeDlg }), el('button', { class: 'btn pri', type: 'button', text: isNew ? 'Lançar' : 'Salvar', onclick: async e => {
-    const aluno = f.aluno.value.trim(); if (!aluno) return toast('Informe o nome do aluno.', true); if (!f.unid.value) return toast('Escolha a unidade.', true); if (!f.data.value) return toast('Informe a data.', true); if (!f.inicio.value) return toast('Informe a data de início das aulas.', true); if (!f.turma.value.trim()) return toast('Informe o ID da turma.', true);
-    const data = { campanhaId: c.id, aluno, codigo: f.codigo.value.trim(), tipo: f.tipo.value, data: f.data.value, unidadeId: f.unid.value, grupo: f.grupo.value.trim(), inicioAulas: f.inicio.value, turmaId: f.turma.value.trim(), noSistema: f.sis.checked, obs: f.obs.value.trim() };
+    const aluno = f.aluno.value.trim(); if (!aluno) return toast('Informe o nome do aluno.', true); if (!f.unid.value) return toast('Escolha a unidade.', true); if (!f.data.value) return toast('Informe a data.', true); if (!f.inicio.value) return toast('Informe a data de início das aulas.', true); if (!f.turma.value.trim()) return toast('Informe o ID da turma.', true); if (!f.fonte.value) return toast('Informe de onde veio o lead.', true);
+    const data = { campanhaId: c.id, aluno, codigo: f.codigo.value.trim(), tipo: f.tipo.value, data: f.data.value, unidadeId: f.unid.value, grupo: f.grupo.value.trim(), inicioAulas: f.inicio.value, turmaId: f.turma.value.trim(), fonteLead: f.fonte.value, noSistema: f.sis.checked, obs: f.obs.value.trim() };
     e.target.disabled = true;
     try { if (isNew) await write(db => db.collection('participacoes').doc().set({ ...data, origem: 'manual', entregue: false, dataEntrega: '', recebidoPor: '', criadoEm: Date.now(), criadoPor: S.uid || '' })); else await updDoc('participacoes', p.id, data); closeDlg(); toast(isNew ? 'Aluno lançado.' : 'Lançamento salvo.'); } catch (err) { e.target.disabled = false; }
   } }));
-  openDlg(isNew ? 'Lançar aluno' : 'Editar lançamento', el('div', { class: 'form' }, field('Aluno', f.aluno, null, true), field('Código no sistema', f.codigo), field('Tipo', f.tipo), field('Data da matrícula / abertura do grupo', f.data), field('Início das aulas', f.inicio), field('ID da turma', f.turma), field('Unidade', f.unid), field('Grupo (se for grupo aberto)', f.grupo, null, true), el('label', { class: 'chk full' }, f.sis, 'Aluno já está cadastrado no sistema'), field('Observação', f.obs, null, true)), acts);
+  openDlg(isNew ? 'Lançar aluno' : 'Editar lançamento', el('div', { class: 'form' }, field('Aluno', f.aluno, null, true), field('Código no sistema', f.codigo), field('Tipo', f.tipo), field('Data da matrícula / abertura do grupo', f.data), field('Início das aulas', f.inicio), field('ID da turma', f.turma), field('De onde veio o lead', f.fonte), field('Unidade', f.unid), field('Grupo (se for grupo aberto)', f.grupo, null, true), el('label', { class: 'chk full' }, f.sis, 'Aluno já está cadastrado no sistema'), field('Observação', f.obs, null, true)), acts);
   f.aluno.focus();
 }
 function deliverDlg(ids) {
@@ -645,7 +655,7 @@ function deliverDlg(ids) {
 }
 
 /* ---------- importação ---------- */
-const MAPS = { aluno: ['Aluno', /alun|nome|student/], codigo: ['Código no sistema', /c[oó]d|matr[ií]cula n|^id$|ra$|registro|n[ºo°] ?matr/], data: ['Data', /data|dt|date/], tipo: ['Tipo (matrícula / grupo)', /tipo|origem|categoria|modalidade/], unidade: ['Unidade', /unid|franq|escola|filial|polo/], grupo: ['Grupo', /grupo|class/], inicio: ['Início das aulas', /in[ií]cio|come[cç]o|1[ªa] aula|primeira aula|start/], turma: ['ID da turma', /turma/] };
+const MAPS = { aluno: ['Aluno', /alun|nome|student/], codigo: ['Código no sistema', /c[oó]d|matr[ií]cula n|^id$|ra$|registro|n[ºo°] ?matr/], data: ['Data', /data|dt|date/], tipo: ['Tipo (matrícula / grupo)', /tipo|origem|categoria|modalidade/], unidade: ['Unidade', /unid|franq|escola|filial|polo/], grupo: ['Grupo', /grupo|class/], inicio: ['Início das aulas', /in[ií]cio|come[cç]o|1[ªa] aula|primeira aula|start/], turma: ['ID da turma', /turma/], fonte: ['De onde veio o lead', /origem do lead|fonte|canal|como conheceu|midia|m[ií]dia|veio/] };
 function importDlg() {
   const c = currentCamp(); if (!c) return toast('Crie uma campanha antes.', true);
   const file = el('input', { type: 'file', id: 'i-file', accept: '.csv,.xlsx,.xls' });
@@ -675,16 +685,16 @@ function importDlg() {
       const g = k => sels[k].value === '' ? null : +sels[k].value; const out = [];
       for (const r of rows) { const aluno = g('aluno') != null ? String(r[g('aluno')]).trim() : ''; if (!aluno) continue;
         const uname = g('unidade') != null ? String(r[g('unidade')]).trim() : ''; const known = uname ? unitList().find(u => norm(u.nome) === norm(uname)) : null;
-        out.push({ aluno, codigo: g('codigo') != null ? String(r[g('codigo')]).trim() : '', data: g('data') != null ? parseDate(r[g('data')]) : '', tipo: (g('tipo') != null && tipoFrom(r[g('tipo')])) || defTipo.value, grupo: g('grupo') != null ? String(r[g('grupo')]).trim() : '', inicioAulas: g('inicio') != null ? parseDate(r[g('inicio')]) : '', turmaId: g('turma') != null ? String(r[g('turma')]).trim() : '', unidadeNome: uname, unidadeId: MASTER_UNIT || (known ? known.id : (uname ? 'novo:' + uname : defUnit.value)) }); }
+        out.push({ aluno, codigo: g('codigo') != null ? String(r[g('codigo')]).trim() : '', data: g('data') != null ? parseDate(r[g('data')]) : '', tipo: (g('tipo') != null && tipoFrom(r[g('tipo')])) || defTipo.value, grupo: g('grupo') != null ? String(r[g('grupo')]).trim() : '', inicioAulas: g('inicio') != null ? parseDate(r[g('inicio')]) : '', turmaId: g('turma') != null ? String(r[g('turma')]).trim() : '', fonteLead: g('fonte') != null ? fonteDe(r[g('fonte')]) : '', unidadeNome: uname, unidadeId: MASTER_UNIT || (known ? known.id : (uname ? 'novo:' + uname : defUnit.value)) }); }
       return out;
     }
     function preview() {
       const list = build(); const keys = new Set(partsOf(c.id).map(p => p.codigo ? 'c:' + norm(p.codigo) : 'n:' + norm(p.aluno) + '|' + p.unidadeId));
       let dup = 0, semU = 0, semD = 0; for (const x of list) { if (keys.has(x.codigo ? 'c:' + norm(x.codigo) : 'n:' + norm(x.aluno) + '|' + x.unidadeId)) dup++; if (!x.unidadeId) semU++; if (!x.data) semD++; }
       const novos = new Set(list.filter(x => String(x.unidadeId).startsWith('novo:')).map(x => x.unidadeNome));
-      prev.replaceChildren(el('div', { class: 'tablewrap' }, el('table', {}, el('thead', {}, el('tr', {}, ['Aluno', 'Código', 'Data', 'Início das aulas', 'ID da turma', 'Tipo', 'Unidade'].map(h => el('th', { text: h })))), el('tbody', {}, list.slice(0, 6).map(x => el('tr', {}, el('td', { text: x.aluno }), el('td', { text: x.codigo || '—' }), el('td', { text: x.data ? fmtD(x.data) : 'sem data' }), el('td', { text: x.inicioAulas ? fmtD(x.inicioAulas) : 'falta' }), el('td', { text: x.turmaId || 'falta' }), el('td', { text: x.tipo }), el('td', { text: x.unidadeNome || unitName(x.unidadeId) })))))));
-      const semIni = list.filter(x => !x.inicioAulas).length, semTur = list.filter(x => !x.turmaId).length;
-      info.textContent = `${nf.format(list.length - dup)} alunos serão importados.` + (semIni || semTur ? ` Atenção: ${semIni ? semIni + ' sem início das aulas' : ''}${semIni && semTur ? ' e ' : ''}${semTur ? semTur + ' sem ID da turma' : ''}; complete depois em Editar.` : '') + (dup ? ` ${dup} já estavam lançados nesta campanha e serão ignorados.` : '') + (novos.size ? ` Unidades novas: ${[...novos].join(', ')}.` : '') + (semU ? ` ${semU} sem unidade: escolha a unidade padrão.` : '') + (semD ? ` ${semD} sem data (vão aparecer como fora da regra).` : '');
+      prev.replaceChildren(el('div', { class: 'tablewrap' }, el('table', {}, el('thead', {}, el('tr', {}, ['Aluno', 'Código', 'Data', 'Início das aulas', 'ID da turma', 'Origem', 'Tipo', 'Unidade'].map(h => el('th', { text: h })))), el('tbody', {}, list.slice(0, 6).map(x => el('tr', {}, el('td', { text: x.aluno }), el('td', { text: x.codigo || '—' }), el('td', { text: x.data ? fmtD(x.data) : 'sem data' }), el('td', { text: x.inicioAulas ? fmtD(x.inicioAulas) : 'falta' }), el('td', { text: x.turmaId || 'falta' }), el('td', { text: x.fonteLead || '—' }), el('td', { text: x.tipo }), el('td', { text: x.unidadeNome || unitName(x.unidadeId) })))))));
+      const semIni = list.filter(x => !x.inicioAulas).length, semTur = list.filter(x => !x.turmaId).length, semFon = list.filter(x => !x.fonteLead).length;
+      info.textContent = `${nf.format(list.length - dup)} alunos serão importados.` + (semIni || semTur ? ` Atenção: ${semIni ? semIni + ' sem início das aulas' : ''}${semIni && semTur ? ' e ' : ''}${semTur ? semTur + ' sem ID da turma' : ''}; complete depois em Editar.` : '') + (semFon ? ` ${semFon} sem a origem do lead.` : '') + (dup ? ` ${dup} já estavam lançados nesta campanha e serão ignorados.` : '') + (novos.size ? ` Unidades novas: ${[...novos].join(', ')}.` : '') + (semU ? ` ${semU} sem unidade: escolha a unidade padrão.` : '') + (semD ? ` ${semD} sem data (vão aparecer como fora da regra).` : '');
       go.disabled = !list.length || (semU > 0) || sels.aluno.value === '' || (novos.size > 0 && !newUnits.checked);
       go._list = list; go._keys = keys;
     }
@@ -695,7 +705,7 @@ function importDlg() {
         const created = {};
         for (const x of list) if (String(x.unidadeId).startsWith('novo:')) { const nm = x.unidadeNome; if (!created[norm(nm)]) { const id = slug(nm); await setDoc('unidades', id, { nome: nm, cidade: '', criadoEm: Date.now() }); created[norm(nm)] = id; } x.unidadeId = created[norm(nm)]; }
         const todo = list.filter(x => { const k = x.codigo ? 'c:' + norm(x.codigo) : 'n:' + norm(x.aluno) + '|' + x.unidadeId; if (keys.has(k)) return false; keys.add(k); return true; });
-        let i = 0; const worker = async () => { while (i < todo.length) { const x = todo[i++]; try { await write(db => db.collection('participacoes').doc().set({ campanhaId: c.id, aluno: x.aluno, codigo: x.codigo, tipo: x.tipo, data: x.data, unidadeId: x.unidadeId, grupo: x.grupo, inicioAulas: x.inicioAulas || '', turmaId: x.turmaId || '', noSistema: true, origem: 'importação', entregue: false, dataEntrega: '', recebidoPor: '', obs: '', criadoEm: Date.now(), criadoPor: S.uid || '' }), 6); done++; } catch (e) { fail++; if (e && (e.code === 'quota_exceeded' || e.code === 'invalid_argument')) { i = todo.length; } } bar.style.width = Math.round((done + fail) / Math.max(1, todo.length) * 100) + '%'; info.textContent = `Importando… ${done} de ${todo.length}`; } };
+        let i = 0; const worker = async () => { while (i < todo.length) { const x = todo[i++]; try { await write(db => db.collection('participacoes').doc().set({ campanhaId: c.id, aluno: x.aluno, codigo: x.codigo, tipo: x.tipo, data: x.data, unidadeId: x.unidadeId, grupo: x.grupo, inicioAulas: x.inicioAulas || '', turmaId: x.turmaId || '', fonteLead: x.fonteLead || '', noSistema: true, origem: 'importação', entregue: false, dataEntrega: '', recebidoPor: '', obs: '', criadoEm: Date.now(), criadoPor: S.uid || '' }), 6); done++; } catch (e) { fail++; if (e && (e.code === 'quota_exceeded' || e.code === 'invalid_argument')) { i = todo.length; } } bar.style.width = Math.round((done + fail) / Math.max(1, todo.length) * 100) + '%'; info.textContent = `Importando… ${done} de ${todo.length}`; } };
         await Promise.all([worker(), worker(), worker()]);
         closeDlg(); toast(fail ? `${done} importados, ${fail} com erro. Importe de novo: os já lançados são ignorados.` : `${done} alunos importados.`, !!fail);
       } catch (e) { go.disabled = false; }
@@ -708,8 +718,8 @@ async function exportCsv() {
   const c = currentCamp(); if (!c) return;
   const { ev } = metrics(c); let rows = partsOf(c.id); if (S.unitId) rows = rows.filter(p => p.unidadeId === S.unitId);
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const lines = [['Campanha', 'Unidade', 'Aluno', 'Código', 'Tipo', 'Grupo', 'Data', 'Início das aulas', 'ID da turma', 'No sistema', 'Situação', 'Motivo', 'Entregue', 'Data da entrega', 'Recebido por', 'Origem'].map(q).join(';')];
-  for (const p of rows.sort((a, b) => unitName(a.unidadeId).localeCompare(unitName(b.unidadeId)) || (a.aluno || '').localeCompare(b.aluno || ''))) { const e = ev.get(p.id) || {}; lines.push([c.nome, unitName(p.unidadeId), p.aluno, p.codigo, p.tipo, p.grupo, fmtD(p.data), p.inicioAulas ? fmtD(p.inicioAulas) : '', p.turmaId || '', p.noSistema ? 'Sim' : 'Não', e.ok ? 'Com direito' : 'Fora da regra', e.motivo || '', p.entregue ? 'Sim' : 'Não', p.dataEntrega ? fmtD(p.dataEntrega) : '', p.recebidoPor, p.origem].map(q).join(';')); }
+  const lines = [['Campanha', 'Unidade', 'Aluno', 'Código', 'Tipo', 'Grupo', 'Data', 'Início das aulas', 'ID da turma', 'De onde veio o lead', 'No sistema', 'Situação', 'Motivo', 'Entregue', 'Data da entrega', 'Recebido por', 'Origem'].map(q).join(';')];
+  for (const p of rows.sort((a, b) => unitName(a.unidadeId).localeCompare(unitName(b.unidadeId)) || (a.aluno || '').localeCompare(b.aluno || ''))) { const e = ev.get(p.id) || {}; lines.push([c.nome, unitName(p.unidadeId), p.aluno, p.codigo, p.tipo, p.grupo, fmtD(p.data), p.inicioAulas ? fmtD(p.inicioAulas) : '', p.turmaId || '', p.fonteLead || '', p.noSistema ? 'Sim' : 'Não', e.ok ? 'Com direito' : 'Fora da regra', e.motivo || '', p.entregue ? 'Sim' : 'Não', p.dataEntrega ? fmtD(p.dataEntrega) : '', p.recebidoPor, p.origem].map(q).join(';')); }
   const csv = '﻿' + lines.join('\r\n'); const name = `${slug(c.nome)}${S.unitId ? '-' + slug(unitName(S.unitId)) : ''}-alunos.csv`;
   const dl = typeof claude === 'undefined' ? null : await claude.use('downloads');
   if (dl) { try { await dl.save({ filename: name, data: csv }); } catch (e) { toast('O download não foi concluído.', true); } return; }
