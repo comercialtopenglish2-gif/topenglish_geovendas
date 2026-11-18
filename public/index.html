@@ -614,7 +614,7 @@ header.top{border-bottom:3px solid #FFB400}
 
   <div id="view-vend" hidden style="margin-top:16px"><div id="vendHost"></div></div>
   <div id="view-funil" hidden style="margin-top:16px"><div id="funilHost"></div></div>
-  <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;min-height:80vh;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
+  <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
 </div>
 <footer class="site-foot"><div><b>GeoVenda</b> · Processos Comerciais e Inteligência de praça para vender mais!</div><div>by <b>CNC Training &amp; Consulting</b></div></footer>
 </div>
@@ -1694,7 +1694,7 @@ function initDicas(){
 function switchView(v){
   S.view=v; document.querySelectorAll("#vtabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));
   $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp";
-  if(v==="camp"){ const fr=$("#campFrame"); if(!fr.src){ fr.src="/campanhas"; if(!fr._t) fr._t=setInterval(()=>{ try{ const d=fr.contentDocument; if(d&&d.body&&!$("#view-camp").hidden){ const h=Math.max(d.documentElement.scrollHeight,d.body.scrollHeight); if(h&&Math.abs(h-fr.offsetHeight)>4) fr.style.height=h+"px"; } }catch(e){} },700); } }
+  if(v==="camp"){ const fr=$("#campFrame"); if(!fr.src) fr.src="/campanhas"; /* altura fixa na tela: as janelas (lançar, importar) abrem sempre visíveis */ }
   if(v==="vend"&&window.RADAR) window.RADAR._n();
   if(v==="funil"&&window.GEOFUNIL) window.GEOFUNIL._shown();
   if(window.GV) window.GV.radarView(v);
