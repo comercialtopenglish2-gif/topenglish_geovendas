@@ -1,4 +1,6 @@
-// CMS FALSO no formato da API de PRODUÇÃO (docs/GUIA_INTEGRACAO_FRONT_API.md). Só para testes locais.
+// CMS FALSO para testes locais. Atende os dois formatos:
+//  - API /admin (docs/INTEGRACAO_API_FRONT.md, como em cmsdev): /admin/health, /admin/auth/login (201), /admin/auth/me
+//  - API antiga de produção (docs/GUIA_INTEGRACAO_FRONT_API.md): /v1/authentication, /v2/webbook/login, /webbook/teacher/dashboard
 // Usuários (senha de todos: teste123):
 //   franqueador@teste.com (role 1) · master.rj@teste.com (role 2) · master.novo@teste.com (role 2, sem acesso liberado)
 //   professor@teste.com (role 3) · desativado@teste.com (desativado)
@@ -10,12 +12,17 @@ const PORT = Number(process.env.MOCK_CMS_PORT || 4000);
 const SEGREDO = process.env.MOCK_PASSWORD_SECRET || "segredo-de-teste";
 const JWT_SECRET = "jwt-falso";
 const USERS = [
-  { id: 1, email: "franqueador@teste.com", nickname: "Diretoria", role: "Franqueador", status: "ativado" },
-  { id: 11, email: "master.rj@teste.com", nickname: "Rita", role: "Master Franqueado", status: "ativado" },
-  { id: 12, email: "master.novo@teste.com", nickname: "Novo", role: "Master Franqueado", status: "ativado" },
-  { id: 20, email: "professor@teste.com", nickname: "Prof. Ana", role: "Professor", status: "ativado" },
-  { id: 30, email: "desativado@teste.com", nickname: "Ex", role: "Master Franqueado", status: "desativado" },
+  { id: 1, email: "franqueador@teste.com", nickname: "Diretoria", role: "Franqueador", role_id: 1, unit_id: 1, status: "ativado" },
+  { id: 11, email: "master.rj@teste.com", nickname: "Rita", role: "Master Franqueado", role_id: 2, unit_id: 7, status: "ativado" },
+  { id: 12, email: "master.novo@teste.com", nickname: "Novo", role: "Master Franqueado", role_id: 2, unit_id: 4, status: "ativado" },
+  { id: 20, email: "professor@teste.com", nickname: "Prof. Ana", role: "Professor", role_id: 3, unit_id: 7, status: "ativado" },
+  { id: 30, email: "desativado@teste.com", nickname: "Ex", role: "Master Franqueado", role_id: 2, unit_id: 7, status: "desativado" },
 ];
+const UNITS = { 1: { id: 1, name: "Unidade Maceió", status: true, region: null, city: "Maceió", state: "Alagoas" },
+  4: { id: 4, name: "Recife Sul", status: true, region: null, city: null, state: null },
+  7: { id: 7, name: "Niterói", status: true, region: null, city: "Niterói", state: "Rio de Janeiro" } };
+const ROLE_KEY = { 1: "super_admin", 2: "admin", 3: "teacher" };
+const userAdmin = u => ({ id: u.id, name: u.nickname, nickname: u.nickname, email: u.email, role: ROLE_KEY[u.role_id], role_id: u.role_id, unit_id: u.unit_id, status: u.status === "desativado" ? "desativado" : "ativo" });
 const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
 function jwt(payload, segredo) { const h = b64({ alg: "HS256", typ: "JWT" }), p = b64(payload); return `${h}.${p}.` + crypto.createHmac("sha256", segredo).update(h + "." + p).digest("base64url"); }
 function verificar(token, segredo) {
@@ -36,6 +43,20 @@ const corpo = req => new Promise(ok => { let b = ""; req.on("data", c => b += c)
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
+  if (url.pathname === "/admin/health") return json(res, 200, { status: "ok", service: "topenglish-admin-api (mock)" });
+  if (url.pathname === "/admin/auth/login" && req.method === "POST") {
+    const b = await corpo(req), r = autenticar(b.email, b.password);
+    if (r.erro === "User desactivated.") return json(res, 403, { error: "forbidden", message: "Usuário desativado." });
+    if (r.erro) return json(res, 401, { error: "unauthorized", message: "E-mail ou senha inválidos." });
+    if (![1, 2, 3].includes(r.u.role_id)) return json(res, 403, { error: "forbidden", message: "Perfil sem acesso ao Admin." });
+    return json(res, 201, { token: r.token, token_type: "Bearer", expires_in_hours: 24, user: userAdmin(r.u), unit: UNITS[r.u.unit_id] || null });
+  }
+  if (url.pathname === "/admin/auth/me") {
+    const t = String(req.headers.authorization || "").replace(/^Bearer /, ""), p = verificar(t, JWT_SECRET);
+    if (!p || p.exp * 1000 < Date.now()) return json(res, 401, { error: "unauthorized", message: "Token inválido ou expirado." });
+    const u = USERS.find(x => x.id === p.user_id);
+    return json(res, 200, { user: userAdmin(u), unit: UNITS[u.unit_id] || null, capabilities: { mgmt: u.role_id <= 2, super_admin: u.role_id === 1, teacher_portal: u.role_id === 3 } });
+  }
   if (url.pathname === "/v1/authentication.json" || url.pathname === "/v1/authentication") {
     const r = autenticar(url.searchParams.get("email"), url.searchParams.get("pass"));
     return r.erro ? json(res, 200, { status: "ERROR", message: r.erro }) : json(res, 200, { token: r.token, token_auth: r.token });

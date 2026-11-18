@@ -1,7 +1,8 @@
-// Login e sessão pela API que está em produção no Top English CMS (docs/GUIA_INTEGRACAO_FRONT_API.md).
-//  - Login v2 (preferido): POST /v2/webbook/login com payload JWT HS256 assinado no SERVIDOR com CMS_PASSWORD_SECRET.
-//  - Login v1 (quando não há CMS_PASSWORD_SECRET): GET /v1/authentication.json, chamado só servidor-a-servidor, em HTTPS.
-//  - Validação contínua: GET /webbook/teacher/dashboard com Authorization: Bearer (cache de 60 s).
+// Login e sessão no Top English CMS. Dois modos, escolhidos por CMS_API:
+//  - "admin" (padrão): API /admin do CMS (docs/INTEGRACAO_API_FRONT.md). POST /admin/auth/login e GET /admin/auth/me,
+//    que devolvem papel (role_id) e unidade. Disponível em cmsdev.topenglish.com.br; será publicada em cms.topenglish.com.br.
+//  - "legado": API que está hoje em cms.topenglish.com.br (docs/GUIA_INTEGRACAO_FRONT_API.md). Login v2 assinado no servidor
+//    (CMS_PASSWORD_SECRET) ou v1 servidor-a-servidor; validação por /webbook/teacher/dashboard; papel pela tabela acessos.
 // O token do CMS fica no banco (tabela sessoes). O navegador recebe só um id aleatório em cookie HttpOnly.
 // Nada aqui registra em log senha, token, cookie ou a URL do login v1.
 import crypto from "node:crypto";
@@ -13,6 +14,7 @@ export const COOKIE = "gv_session";
 const TTL_CACHE_MS = Number(process.env.AUTH_CACHE_MS || 60 * 1000);
 const TIMEOUT_MS = 10000;
 const HORAS_SESSAO = 24;
+export const MODO = () => String(process.env.CMS_API || "admin").trim().toLowerCase() === "legado" ? "legado" : "admin";
 
 const sha = s => crypto.createHash("sha256").update(String(s)).digest("hex");
 const b64url = b => Buffer.from(b).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -74,8 +76,42 @@ function lerPayload(token) {
   try { return JSON.parse(Buffer.from(String(token).split(".")[1], "base64url").toString("utf8")); } catch { return {}; }
 }
 
+// ---------- modo "admin": POST /admin/auth/login e GET /admin/auth/me ----------
+async function loginAdmin(email, password) {
+  let r;
+  try { r = await cms("/admin/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }); }
+  catch { return { ok: false, status: 502, message: "Não consegui falar com o sistema da Top English agora. Tente novamente." }; }
+  const c = r.corpo || {};
+  if (r.status >= 200 && r.status < 300 && c.token) {
+    const u = c.user || {};
+    return { ok: true, token: c.token, nome: u.name || u.nickname || null, userId: u.id ?? null, exp: Date.now() + (Number(c.expires_in_hours) || 24) * 3600 * 1000, user: u, unit: c.unit || null };
+  }
+  console.warn("Login no CMS (admin) não aceito: " + resumo(r));
+  if (r.status === 401) return { ok: false, status: 401, message: "E-mail ou senha incorretos." };
+  if (r.status === 403) return { ok: false, status: 403, message: c.message || "Acesso negado pelo sistema da Top English." };
+  return { ok: false, status: 502, message: "O sistema da Top English não respondeu. Tente novamente." };
+}
+const cacheMe = new Map();
+async function validarAdmin(token) {
+  const k = sha(token), c = cacheMe.get(k);
+  if (c && Date.now() - c.em < TTL_CACHE_MS) return { ok: true, me: c.me };
+  let r;
+  try { r = await cms("/admin/auth/me", { headers: { Authorization: "Bearer " + token } }); }
+  catch { cacheMe.delete(k); console.warn("Validação: /admin/auth/me sem resposta."); return { ok: false, status: 503 }; }
+  if (r.status === 200 && r.corpo && r.corpo.user) {
+    cacheMe.set(k, { me: r.corpo, em: Date.now() });
+    if (cacheMe.size > 5000) for (const [kk, v] of cacheMe) if (Date.now() - v.em > TTL_CACHE_MS) cacheMe.delete(kk);
+    return { ok: true, me: r.corpo };
+  }
+  cacheMe.delete(k);
+  if (r.status === 401 || r.status === 403) return { ok: false, status: 401 };
+  console.warn("Validação: /admin/auth/me respondeu " + r.status + ".");
+  return { ok: false, status: 503 };
+}
+
 // Login no CMS. Devolve { ok, token, nome, userId, exp } ou { ok:false, status, message }
 export async function loginCms(email, password) {
+  if (MODO() === "admin") return loginAdmin(email, password);
   let r;
   try {
     const segredo = process.env.CMS_PASSWORD_SECRET;
@@ -119,6 +155,7 @@ const cache = new Map();
 const tokenRecusado = (st, b) => st === 401 || st === 403 || (b && b.status === "ERROR" && (b.code === 101 || /token|expir|auth|inválid|invalid|unauthori|payload|login/i.test(String(b.message || ""))));
 export async function validarToken(token) {
   if (!token) return { ok: false, status: 401 };
+  if (MODO() === "admin") return validarAdmin(token);
   const k = sha(token);
   const c = cache.get(k);
   if (c && Date.now() - c.em < TTL_CACHE_MS) return { ok: true, perfil: c.perfil };
@@ -162,5 +199,5 @@ export async function encerrarSessao(req) {
   const id = lerCookie(req, COOKIE);
   if (!id || !/^[a-f0-9]{64}$/.test(id)) return;
   const r = await getPool().query("DELETE FROM sessoes WHERE id_hash=$1 RETURNING token", [sha(id)]);
-  if (r.rows[0]) cache.delete(sha(r.rows[0].token));
+  if (r.rows[0]) { cache.delete(sha(r.rows[0].token)); cacheMe.delete(sha(r.rows[0].token)); }
 }

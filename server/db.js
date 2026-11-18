@@ -147,6 +147,35 @@ export async function registrarPessoa({ pessoaId, email, nome, perfil }) {
     [pessoaId, nome || null, String(email).toLowerCase(), perfil || null]);
 }
 
+// modo "admin": registra a pessoa e a unidade que o CMS devolveu (a unidade só preenche campos ainda vazios,
+// para não apagar correções do franqueador feitas em /acessos)
+export async function registrarDoCms(me, uf) {
+  const u = (me && me.user) || {}, un = (me && me.unit) || null;
+  await getPool().query(
+    `INSERT INTO pessoas(id,nome,email,role_id,unit_id,perfil_cms,ultimo_login) VALUES ($1,$2,$3,$4,$5,$6,now())
+     ON CONFLICT (id) DO UPDATE SET nome=EXCLUDED.nome, email=EXCLUDED.email, role_id=EXCLUDED.role_id, unit_id=EXCLUDED.unit_id, perfil_cms=EXCLUDED.perfil_cms, ultimo_login=now()`,
+    ["cms-" + u.id, u.name || u.nickname || null, u.email ? String(u.email).toLowerCase() : null, u.role_id ?? null, u.unit_id ?? null, u.role || null]);
+  if (un && un.id != null) {
+    await getPool().query(
+      `INSERT INTO unidades(unit_id,nome,uf,cidade) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (unit_id) DO UPDATE SET nome=coalesce(unidades.nome,EXCLUDED.nome), uf=coalesce(unidades.uf,EXCLUDED.uf), cidade=coalesce(unidades.cidade,EXCLUDED.cidade)`,
+      [Number(un.id), un.name || null, uf || null, un.city || null]);
+  }
+}
+export async function dePara(unitId) {
+  if (unitId == null) return null;
+  const r = await getPool().query("SELECT unit_id, nome, uf, cidade FROM unidades WHERE unit_id=$1", [Number(unitId)]);
+  return r.rows[0] || null;
+}
+export async function painelUnidadesCms() {
+  const [u, p] = await Promise.all([
+    getPool().query(`SELECT u.unit_id, u.nome, u.uf, u.cidade, (SELECT count(*) FROM pessoas p WHERE p.unit_id=u.unit_id) AS pessoas
+                       FROM unidades u ORDER BY u.nome NULLS LAST, u.unit_id`),
+    getPool().query(`SELECT email, nome, perfil_cms, role_id, unit_id, ultimo_login FROM pessoas WHERE role_id IS NOT NULL ORDER BY ultimo_login DESC NULLS LAST LIMIT 200`),
+  ]);
+  return { unidades: u.rows, pessoas: p.rows };
+}
+
 export async function acessoDe(email) {
   const r = await getPool().query(
     `SELECT a.email, a.papel, a.unit_id, a.ativo, u.nome AS unidade_nome, u.uf, u.cidade

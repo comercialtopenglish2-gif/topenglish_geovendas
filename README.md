@@ -16,13 +16,13 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 - **Todo o resto exige sessão.** Sem sessão:
   - páginas redirecionam para `/login`;
   - arquivos e API respondem `401`.
-- **Login** (API que está em produção no CMS, `docs/GUIA_INTEGRACAO_FRONT_API.md`), sempre feito pelo servidor, nunca pelo navegador:
-  - com `CMS_PASSWORD_SECRET`: login v2 `POST /v2/webbook/login`, com o payload `{email, password, type:"teacher"}` assinado (HS256) no servidor;
-  - sem essa chave: login v1 `GET /v1/authentication`, em HTTPS. A URL nunca vai para log.
+- **Login no Top English CMS**, sempre feito pelo servidor, nunca pelo navegador. A variável `CMS_API` escolhe a API:
+  - `admin` (padrão): `POST /admin/auth/login` e `GET /admin/auth/me` (`docs/INTEGRACAO_API_FRONT.md`). Papel e unidade vêm do CMS. Hoje em `https://cmsdev.topenglish.com.br`.
+  - `legado`: API antiga de `cms.topenglish.com.br` (`docs/GUIA_INTEGRACAO_FRONT_API.md`), com login v2 (`CMS_PASSWORD_SECRET`) ou v1, e papel pela tabela `acessos`.
 - **Sessão:**
   - o navegador recebe só um id aleatório no cookie `gv_session` (`HttpOnly`, `Secure` em produção, `SameSite=Lax`, até 24 h);
   - o token do CMS fica no banco (tabela `sessoes`); o JavaScript da página nunca o vê;
-  - o token é conferido no CMS em `GET /webbook/teacher/dashboard`, com cache de 60 s;
+  - o token é conferido no CMS a cada 60 s (`/admin/auth/me` no modo `admin`; `/webbook/teacher/dashboard` no `legado`);
   - se o CMS estiver fora do ar e o cache vencido, a resposta é `503`: o acesso nunca é liberado por padrão.
 - **`public/claude-shim.js`** recria o `window.claude.use(...)` que o app usava dentro do Claude:
   - `user`: `id`, `isOwner`, `can`, `canEdit`, `profiles`;
@@ -33,19 +33,19 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
   Ele também limpa o cache local quando outra pessoa entra no mesmo navegador e mostra quem está logado, com o botão **Sair**.
 - A identidade chega ao front por `window.GV_SESSION`, que o servidor injeta no `index.html` a cada requisição. A mesma informação está em `GET /api/session`.
 
-## Papéis (decisão D2) · `server/roles.js` e `/acessos`
+## Papéis (decisão D2) · `server/roles.js`
 
-A API de produção do CMS confirma e-mail e senha, mas **não informa papel nem unidade**. Por isso o GeoVenda guarda quem pode entrar:
+**Modo `admin` (padrão):** o papel vem do `role_id` do CMS.
 
-| Papel no GeoVenda | Como se define | Acesso |
+| CMS `role_id` | No GeoVenda | Acesso |
 |---|---|---|
-| Franqueador | e-mail em `GV_FRANQUEADORES` (Railway) ou liberado como franqueador em `/acessos` | todos os estados e unidades; edita os textos-base (Método, Top English); libera acessos e cria unidades em `/acessos` |
-| Master | liberado em `/acessos`, sempre com uma unidade (nome, UF, cidade) | só a UF da unidade (arquivos `data/` e `bairros/` de outras UFs dão `403`) e só o funil da unidade |
-| Qualquer outro (inclusive professores) | não está em `/acessos` | bloqueado: "Seu acesso ao GeoVenda ainda não foi liberado." |
+| 1 · Franqueador (super_admin) | `master` | todos os estados e unidades; edita os textos-base; corrige UF/cidade das unidades em `/acessos` |
+| 2 · Master franqueado (admin) | `unidade` | só a UF da unidade do CMS (outras UFs dão `403`) e só o funil da unidade (`unit-<unit_id>`) |
+| 3 · Professor, 4 · Gráfica, outros | bloqueado | "Perfil sem acesso ao GeoVenda." |
 
-- Quem tenta entrar sem acesso aparece em **Pessoas aguardando liberação**, em `/acessos`, com o perfil que o CMS informa. Basta clicar em **Liberar**.
-- Desativar ou remover um acesso derruba a sessão da pessoa na hora.
-- Usuário desativado no CMS não consegue mais entrar; a sessão aberta dura no máximo 24 h.
+- O CMS manda o estado por extenso ("Alagoas"); o GeoVenda converte para a sigla (AL). Se a unidade vier sem estado, o master vê "Sua unidade ainda não tem estado configurado" até o franqueador preencher a UF em `/acessos`. A correção do franqueador vale sobre o que o CMS mandar.
+
+**Modo `legado`:** a API antiga não informa papel nem unidade. Os franqueadores vêm de `GV_FRANQUEADORES`; os masters são liberados em `/acessos` (com unidade, UF e cidade); quem não está na lista, inclusive professores, fica bloqueado.
 
 ## Regras de dados · `server/db.js`
 
@@ -76,10 +76,11 @@ createdb geovenda
 npm run mock-cms                     # CMS falso em :4000 (usuários de teste, senha teste123)
 DATABASE_URL=postgres://localhost/geovenda CMS_BASE_URL=http://localhost:4000 npm run dev
 # abra http://localhost:8080 e entre com franqueador@teste.com / teste123
-npm test                             # matriz de testes de acesso (com o servidor e o CMS falso no ar)
+npm test                             # matriz de testes de acesso, modo admin (banco limpo, servidor e CMS falso no ar)
+# modo legado: rode o servidor com CMS_API=legado GV_FRANQUEADORES=franqueador@teste.com e use npm run test:legado
 ```
 
-Usuários do CMS falso (formato da API de produção): `franqueador@teste.com`, `master.rj@teste.com`, `master.novo@teste.com`, `professor@teste.com` e `desativado@teste.com`. Rode o servidor com `GV_FRANQUEADORES=franqueador@teste.com`. Para testar o login v2, use `CMS_PASSWORD_SECRET=segredo-de-teste`.
+Usuários do CMS falso (atende os dois formatos de API): `franqueador@teste.com`, `master.rj@teste.com` (unidade no RJ), `master.novo@teste.com` (unidade sem estado), `professor@teste.com` e `desativado@teste.com`. No modo legado, rode o servidor com `GV_FRANQUEADORES=franqueador@teste.com`; para testar o login v2, use `CMS_PASSWORD_SECRET=segredo-de-teste`.
 
 Para testar a IA sem custo, rode `node server/dev/mock-anthropic.js` e use `ANTHROPIC_API_KEY=teste ANTHROPIC_API_URL=http://localhost:4100`.
 
@@ -91,8 +92,9 @@ Veja `.env.example`.
 |---|---|
 | `DATABASE_URL` | obrigatória |
 | `CMS_BASE_URL` | padrão `https://cms.topenglish.com.br` |
-| `GV_FRANQUEADORES` | e-mails de franqueador, separados por vírgula |
-| `CMS_PASSWORD_SECRET` | opcional: ativa o login v2 (senha só no corpo da requisição) |
+| `CMS_API` | `admin` (padrão) ou `legado` |
+| `GV_FRANQUEADORES` | só no modo legado: e-mails de franqueador, separados por vírgula |
+| `CMS_PASSWORD_SECRET` | só no modo legado, opcional: ativa o login v2 |
 | `NODE_ENV` | `production` no Railway |
 | `PORT` | o Railway injeta |
 | `ANTHROPIC_API_KEY` | opcional: sem ela, a IA fica desligada |
@@ -107,6 +109,6 @@ Deploy automático no Railway a cada push na branch `main`. O healthcheck é `/h
 - **Nomes no painel da equipe:** só aparecem pessoas que já entraram ao menos uma vez.
 - **Fila de pedidos de relatório (Radar › Pedidos):** no Claude, uma rotina externa transformava pedidos em relatórios. Fora do Claude, os pedidos ficam na fila até essa rotina ser recriada no servidor.
 - **Usuário desativado no CMS:** confirmar com o time do CMS se `/webbook/teacher/dashboard` recusa tokens de desativados. Se não recusar, a pessoa mantém a sessão aberta até 24 h (ou até o franqueador desativá-la em `/acessos`).
-- **API `/admin`:** quando o CMS publicar o namespace `/admin` (`docs/INTEGRACAO_API_FRONT.md`), o papel e a unidade poderão vir do CMS em vez da tabela `acessos`.
+- **Ambiente do CMS:** a API `/admin` está em `cmsdev.topenglish.com.br`. Quando for publicada em `cms.topenglish.com.br`, basta trocar `CMS_BASE_URL` no Railway.
 - **CSP:** ainda não foi aplicada, porque o `index.html` usa scripts inline.
 - **Bibliotecas por CDN:** jsPDF, SheetJS, ExcelJS, pdf.js e mammoth ainda vêm de CDN, com versão fixa.

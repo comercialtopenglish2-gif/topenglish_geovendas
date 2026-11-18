@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import * as auth from "./auth.js";
 import * as db from "./db.js";
 import * as ai from "./ai.js";
-import { identidade, MSG_SEM_ACESSO, franqueadoresFixos } from "./roles.js";
+import { identidade, identidadeAdmin, ufDe, MSG_SEM_ACESSO, MSG_PERFIL_BLOQUEADO, franqueadoresFixos } from "./roles.js";
 import crypto from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +48,18 @@ app.post("/auth/login", express.json({ limit: "10kb" }), async (req, res) => {
   if (auth.bloqueadoPorTentativas(req.ip, email)) return res.status(429).json({ message: "Muitas tentativas. Aguarde 15 minutos e tente de novo." });
   const r = await auth.loginCms(emailDigitado, password);
   if (!r.ok) return res.status(r.status).json({ message: r.message });
+  if (auth.MODO() === "admin") {
+    const v = await auth.validarToken(r.token); // papel e unidade vêm do /admin/auth/me
+    if (!v.ok) { console.warn("Login: o CMS aceitou a senha, mas /admin/auth/me falhou (" + v.status + ")."); return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "O sistema da Top English recusou a sessão." : "Não consegui validar seu acesso agora. Tente novamente." }); }
+    const uf = ufDe(v.me.unit && v.me.unit.state);
+    try { await db.registrarDoCms(v.me, uf); } catch (e) { console.error("registrarDoCms falhou:", e.message); }
+    let dp = null; try { dp = await db.dePara(v.me.user && v.me.user.unit_id); } catch {}
+    const ida = identidadeAdmin(v.me, dp);
+    if (!ida.ok) { console.info("Login: papel do CMS sem acesso ao GeoVenda (role_id " + (v.me.user && v.me.user.role_id) + ")."); return res.status(403).json({ message: MSG_PERFIL_BLOQUEADO }); }
+    try { await auth.criarSessao(res, { pessoaId: ida.pessoaId, email: ida.email, token: r.token, exp: r.exp }); }
+    catch (e) { console.error("criarSessao falhou:", e.message); return res.status(503).json({ message: "Banco indisponível. Tente novamente." }); }
+    return res.set("Cache-Control", "no-store").json({ ok: true, next: proximoSeguro(req.body && req.body.next) });
+  }
   // o token acabou de vir do CMS; confere que ele abre a API (e lê o perfil do CMS, só informativo)
   const v = await auth.validarToken(r.token);
   if (!v.ok) { console.warn("Login: o CMS aceitou a senha, mas a conferência do token falhou (" + v.status + ")."); return res.status(v.status === 401 ? 401 : 503).json({ message: v.status === 401 ? "O sistema da Top English recusou a sessão." : "Não consegui validar seu acesso agora. Tente novamente." }); }
@@ -91,15 +103,24 @@ app.use(async (req, res, next) => {
     if (querHtml(req)) return res.status(503).type("html").send(paginaAviso("Não consegui validar seu acesso agora. Tente novamente em instantes."));
     return res.status(503).json({ code: "unavailable", message: "Não consegui validar seu acesso agora. Tente novamente." });
   }
-  let acesso = null, nome = null;
-  try { [acesso, nome] = await Promise.all([db.acessoDe(sessao.email), db.nomePessoa(sessao.pessoaId)]); }
-  catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
-  const id = identidade(sessao, acesso, nome);
+  let id;
+  if (auth.MODO() === "admin") {
+    let dp = null;
+    try { dp = await db.dePara(v.me.user && v.me.user.unit_id); } catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
+    id = identidadeAdmin(v.me, dp);
+    if (id.ok && id.pessoaId !== sessao.pessoaId) id = { ok: false }; // a sessão é de outra pessoa: recusa
+  } else {
+    let acesso = null, nome = null;
+    try { [acesso, nome] = await Promise.all([db.acessoDe(sessao.email), db.nomePessoa(sessao.pessoaId)]); }
+    catch (e) { return res.status(503).json({ code: "unavailable", message: "Banco indisponível." }); }
+    id = identidade(sessao, acesso, nome);
+  }
   if (!id.ok) {
     try { await auth.encerrarSessao(req); } catch {}
     auth.apagarSessao(res);
-    if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(MSG_SEM_ACESSO, true));
-    return res.status(403).json({ code: "forbidden", message: MSG_SEM_ACESSO });
+    const msgBloq = auth.MODO() === "admin" ? MSG_PERFIL_BLOQUEADO : MSG_SEM_ACESSO;
+    if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(msgBloq, true));
+    return res.status(403).json({ code: "forbidden", message: msgBloq });
   }
   req.gv = id;
   if (id.pendente && req.path !== "/api/session" && req.path !== "/claude-shim.js") {
@@ -147,14 +168,19 @@ app.post("/api/ai/sample", express.json({ limit: "30mb" }), (req, res) => ai.sam
 // acessos e unidades (a API de produção do CMS não informa papel nem unidade): só franqueador
 const soMaster = (req, res, next) => req.gv.master ? next() : res.status(403).json({ code: "forbidden", message: "Somente franqueador." });
 app.get("/api/acessos", soMaster, async (req, res) => {
-  try { res.json({ ...(await db.painelAcessos()), fixos: franqueadoresFixos(), eu: req.gv.email }); } catch (e) { trataErro(res, e); }
+  try {
+    if (auth.MODO() === "admin") return res.json({ modo: "admin", ...(await db.painelUnidadesCms()), eu: req.gv.email });
+    res.json({ modo: "legado", ...(await db.painelAcessos()), fixos: franqueadoresFixos(), eu: req.gv.email });
+  } catch (e) { trataErro(res, e); }
 });
-app.post("/api/unidades", soMaster, json2mb, async (req, res) => { try { res.json(await db.criarUnidade(req.body || {})); } catch (e) { trataErro(res, e); } });
+app.post("/api/unidades", soMaster, json2mb, async (req, res) => {
+  if (auth.MODO() === "admin") return res.status(400).json({ code: "invalid_argument", message: "As unidades vêm do sistema da Top English." }); try { res.json(await db.criarUnidade(req.body || {})); } catch (e) { trataErro(res, e); } });
 app.put("/api/unidades/:id", soMaster, json2mb, async (req, res) => {
   if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ code: "invalid_argument", message: "Unidade inválida." });
   try { await db.salvarUnidade(req.params.id, req.body || {}); res.json({ ok: true }); } catch (e) { trataErro(res, e); }
 });
 app.put("/api/acessos/:email", soMaster, json2mb, async (req, res) => {
+  if (auth.MODO() === "admin") return res.status(400).json({ code: "invalid_argument", message: "Os papéis vêm do sistema da Top English." });
   const email = String(req.params.email || "").toLowerCase();
   if (email === req.gv.email && (req.body || {}).papel !== "franqueador") return res.status(400).json({ code: "invalid_argument", message: "Você não pode tirar o seu próprio acesso de franqueador." });
   try { await db.salvarAcesso(email, req.body || {}, req.gv.email); res.json({ ok: true }); } catch (e) { trataErro(res, e); }
@@ -203,7 +229,7 @@ async function iniciar() {
   try { await db.migrar(); }
   catch (e) { console.error("Falha ao preparar o banco:", e.message); process.exit(1); }
   if (!ai.iaLigada()) console.warn("ANTHROPIC_API_KEY ausente: recursos de IA ficam desligados.");
-  app.listen(PORT, () => console.log(`GeoVenda no ar na porta ${PORT} (${PROD ? "produção" : "desenvolvimento"}), CMS: ${process.env.CMS_BASE_URL || "https://cms.topenglish.com.br"}`));
+  app.listen(PORT, () => console.log(`GeoVenda no ar na porta ${PORT} (${PROD ? "produção" : "desenvolvimento"}), CMS: ${process.env.CMS_BASE_URL || "https://cms.topenglish.com.br"}, API do CMS: ${auth.MODO()}`));
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) iniciar();
 export { app, iniciar };

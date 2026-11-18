@@ -17,21 +17,26 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   <p class="sub">O sistema da Top English confirma o e-mail e a senha. Aqui você decide quem entra no GeoVenda, com qual papel e em qual unidade. Quem não estiver na lista não entra, inclusive professores. <a href="/">Voltar ao GeoVenda</a></p>
   <p class="st" id="msg" role="status"></p>
 </main>
-<section class="card">
+<section class="card" id="secPend">
   <h2>Pessoas aguardando liberação</h2>
   <p class="sub">Entraram com e-mail e senha da Top English, mas ainda não têm acesso ao GeoVenda.</p>
   <div class="tw"><table><thead><tr><th>E-mail</th><th>Nome</th><th>Perfil no CMS</th><th>Última tentativa</th><th></th></tr></thead><tbody id="pend"></tbody></table></div>
 </section>
-<section class="card">
+<section class="card" id="secAces">
   <h2>Pessoas com acesso</h2>
   <div class="tw"><table><thead><tr><th>E-mail</th><th>Papel</th><th>Unidade</th><th>Ativo</th><th></th></tr></thead><tbody id="aces"></tbody></table></div>
   <div class="add2"><input id="nEmail" type="email" placeholder="E-mail da pessoa no sistema da Top English"><select id="nPapel"><option value="master">Master</option><option value="franqueador">Franqueador</option></select><select id="nUnid"></select><button class="b" id="nAdd" type="button">Liberar acesso</button></div>
+</section>
+<section class="card" id="secCms" hidden>
+  <h2>Quem já entrou</h2>
+  <p class="sub">Papel e unidade vêm do sistema da Top English: franqueador vê tudo, master vê só a unidade dele, professor não entra.</p>
+  <div class="tw"><table><thead><tr><th>E-mail</th><th>Nome</th><th>Perfil no CMS</th><th>Unidade</th><th>Último acesso</th></tr></thead><tbody id="pess"></tbody></table></div>
 </section>
 <section class="card">
   <h2>Unidades</h2>
   <p class="sub">O master só vê o estado (UF) e o funil da unidade dele.</p>
   <div class="tw"><table><thead><tr><th>Unidade</th><th>UF</th><th>Cidade</th><th>Pessoas</th><th></th></tr></thead><tbody id="unis"></tbody></table></div>
-  <div class="add"><input id="uNome" placeholder="Nome da unidade (ex.: Top English Niterói)"><input id="uUf" class="uf" maxlength="2" placeholder="UF"><input id="uCid" placeholder="Cidade"><button class="b" id="uAdd" type="button">Criar unidade</button></div>
+  <div class="add" id="addUni"><input id="uNome" placeholder="Nome da unidade (ex.: Top English Niterói)"><input id="uUf" class="uf" maxlength="2" placeholder="UF"><input id="uCid" placeholder="Cidade"><button class="b" id="uAdd" type="button">Criar unidade</button></div>
 </section>
 </div>
 <script>
@@ -47,6 +52,15 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   let D=null;
   const opUnid=sel=>D.unidades.map(u=>`<option value="${u.unit_id}"${String(u.unit_id)===String(sel)?" selected":""}>${esc(u.nome)} · ${esc(u.uf||"")}</option>`).join("");
   function render(){
+    if(D.modo==="admin"){
+      document.querySelector("h1").textContent="Unidades e acessos";
+      document.querySelector("main .sub").innerHTML='Quem entra, com qual papel e em qual unidade vem do sistema da Top English. Aqui você só corrige o estado (UF) ou a cidade de uma unidade, se vierem errados. <a href="/">Voltar ao GeoVenda</a>';
+      ["secPend","secAces","addUni"].forEach(i=>$(i).hidden=true); $("secCms").hidden=false;
+      const nomeU=id=>{const u=D.unidades.find(x=>String(x.unit_id)===String(id));return u?u.nome:(id==null?"—":"#"+id)};
+      $("pess").innerHTML=D.pessoas.map(p=>`<tr><td>${esc(p.email)}</td><td>${esc(p.nome)}</td><td>${esc(p.perfil_cms||p.role_id)}</td><td>${esc(nomeU(p.unit_id))}</td><td>${dt(p.ultimo_login)}</td></tr>`).join("")||`<tr><td colspan="5" class="st">Ninguém entrou ainda.</td></tr>`;
+      $("unis").innerHTML=D.unidades.map(u=>`<tr data-u="${u.unit_id}"><td><input class="n" value="${esc(u.nome)}"></td><td><input class="uf" maxlength="2" value="${esc(u.uf)}" style="width:64px"></td><td><input class="c" value="${esc(u.cidade)}"></td><td>${u.pessoas}</td><td><button class="b g su">Salvar</button></td></tr>`).join("")||`<tr><td colspan="5" class="st">As unidades aparecem aqui depois do primeiro login de alguém delas.</td></tr>`;
+      return;
+    }
     $("nUnid").innerHTML=`<option value="">Unidade (para master)</option>`+opUnid("");
     $("pend").innerHTML=D.pendentes.length?D.pendentes.map(p=>`<tr><td>${esc(p.email)}</td><td>${esc(p.nome)}</td><td>${esc(p.perfil_cms||"—")}</td><td>${dt(p.ultimo_login)}</td><td><button class="b g" data-lib="${esc(p.email)}">Liberar</button></td></tr>`).join(""):`<tr><td colspan="5" class="st">Ninguém aguardando.</td></tr>`;
     $("aces").innerHTML=D.acessos.map(a=>{const fixo=D.fixos.includes(a.email);return `<tr data-e="${esc(a.email)}"><td>${esc(a.email)}${a.nome?`<br><span class="st">${esc(a.nome)}${a.perfil_cms?" · CMS: "+esc(a.perfil_cms):""}</span>`:""}${fixo?'<br><span class="st">definido no Railway</span>':""}</td>

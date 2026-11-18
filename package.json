@@ -12,7 +12,8 @@
     "start": "node server/server.js",
     "dev": "NODE_ENV=development node server/server.js",
     "mock-cms": "node server/dev/mock-cms.js",
-    "test": "node server/dev/test-matrix.js"
+    "test": "node server/dev/test-matrix.js",
+    "test:legado": "node server/dev/test-matrix-legado.js"
   },
   "dependencies": {
     "compression": "1.7.5",
