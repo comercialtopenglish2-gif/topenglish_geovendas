@@ -5668,7 +5668,7 @@ const CONQ = [
   ["Fechador", "5 vendas ou mais no mês", (n, m) => (m.venda || 0) >= 5],
   ["Guardião da base", "3 renovações ou mais no mês", (n, m) => (m.renov || 0) >= 3],
   ["Conector", "3 indicações ou mais recebidas de clientes seus no mês", (n, m) => (m.indic || 0) >= 3],
-  ["Ressurreição", "um lead reativado que fechou", (n) => Object.values(FU).some(l => respDe(l) === n && l.reaberto && l.status === "fechou")],
+  ["Reativado", "um lead reativado que fechou", (n) => Object.values(FU).some(l => respDe(l) === n && l.reaberto && l.status === "fechou")],
   ["Treino em dia", "3 treinos ou mais nesta semana", (n) => TREINOS.filter(t => (t.vend || perfil()?.dono) === n && noPer(t.em, "semana")).length >= 3],
   ["Follow-up de ferro", "30 follow-ups ou mais enviados no mês", (n, m) => (m.fup || 0) >= 30]
 ];
