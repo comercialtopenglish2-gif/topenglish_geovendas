@@ -192,8 +192,12 @@ export async function criarSessao(res, { pessoaId, email, token, exp }) {
 export async function lerSessao(req) {
   const id = lerCookie(req, COOKIE);
   if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
-  const r = await getPool().query("SELECT pessoa_id, email, token FROM sessoes WHERE id_hash=$1 AND expira_em > now()", [sha(id)]);
-  return r.rows[0] ? { pessoaId: r.rows[0].pessoa_id, email: r.rows[0].email, token: r.rows[0].token, idHash: sha(id) } : null;
+  const r = await getPool().query("SELECT pessoa_id, email, token, rede_camp FROM sessoes WHERE id_hash=$1 AND expira_em > now()", [sha(id)]);
+  return r.rows[0] ? { pessoaId: r.rows[0].pessoa_id, email: r.rows[0].email, token: r.rows[0].token, redeCamp: !!r.rows[0].rede_camp, idHash: sha(id) } : null;
+}
+// Campanhas e brindes: libera a visão da rede toda nesta sessão (só para quem digitou o código certo)
+export async function liberarRedeCamp(idHash) {
+  await getPool().query("UPDATE sessoes SET rede_camp=true WHERE id_hash=$1", [idHash]);
 }
 export async function encerrarSessao(req) {
   const id = lerCookie(req, COOKIE);

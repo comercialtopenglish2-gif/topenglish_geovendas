@@ -56,7 +56,7 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 | `escolas/<espaço>/…` (GeoFunil) | espaço `unit-<unit_id>` da unidade; franqueador acessa todos |
 | `vendedor/*`, `config/*`, `fontes/*` | todos leem; só o franqueador escreve |
 | `campanhas` (Campanhas e brindes) | todos leem; só o franqueador cria e edita |
-| `unidades`, `participacoes`, `estoque` (Campanhas e brindes) | franqueador vê e altera tudo; o master só vê o que é da unidade dele (`u<unit_id>`), lança e edita alunos dela e não mexe no estoque |
+| `unidades`, `participacoes`, `estoque` (Campanhas e brindes) | franqueador vê e altera tudo depois de digitar o código da franqueadora (`CAMP_CODIGO_REDE`, vale até sair do sistema); o master só vê o que é da unidade dele (`u<unit_id>`), lança e edita alunos dela e não mexe no estoque |
 | `pedidos`, `relatorios`, `monitor`, `horarios`, `proprios`, `dicas`, `palavras` | compartilhados entre todos os logados (como no Claude) |
 | qualquer outro caminho | bloqueado |
 
@@ -95,6 +95,7 @@ Veja `.env.example`.
 | `DATABASE_URL` | obrigatória |
 | `CMS_BASE_URL` | padrão `https://cms.topenglish.com.br` |
 | `CMS_API` | `admin` (padrão) ou `legado` |
+| `CAMP_CODIGO_REDE` | código da franqueadora para ver todas as unidades em Campanhas e brindes; sem ela, ninguém vê a rede toda |
 | `GV_FRANQUEADORES` | só no modo legado: e-mails de franqueador, separados por vírgula |
 | `CMS_PASSWORD_SECRET` | só no modo legado, opcional: ativa o login v2 |
 | `NODE_ENV` | `production` no Railway |

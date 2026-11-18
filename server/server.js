@@ -123,7 +123,8 @@ app.use(async (req, res, next) => {
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(msgBloq, true));
     return res.status(403).json({ code: "forbidden", message: msgBloq });
   }
-  req.gv = id;
+  id.redeCamp = !!(id.master && sessao.redeCamp);
+  req.gv = id; req.sessao = sessao;
   if (id.pendente && req.path !== "/api/session" && req.path !== "/claude-shim.js") {
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(id.motivoPendente, true));
     return res.status(403).json({ code: "pendente", message: id.motivoPendente });
@@ -137,7 +138,7 @@ const sessaoPublica = id => ({
   pessoa: { id: id.pessoaId, nome: id.nome || id.email, email: id.email },
   papel: id.papel, rotulo: id.rotulo, master: id.master, editaBase: id.editaBase,
   unidade: { id: id.unitId, nome: id.unidade, uf: id.uf, cidade: id.cidade },
-  espaco: id.espaco, pendente: id.pendente,
+  espaco: id.espaco, pendente: id.pendente, redeCamp: !!id.redeCamp,
   ia: ai.iaLigada(),
 });
 app.get("/api/session", (req, res) => res.set("Cache-Control", "no-store").json(sessaoPublica(req.gv)));
@@ -195,6 +196,22 @@ app.get(["/acessos", "/unidades"], (req, res) => {
   if (!req.gv.master) return res.status(403).type("html").send(paginaAviso("Somente o franqueador libera acessos."));
   res.set("Cache-Control", "private, no-store").sendFile(path.join(RAIZ, "server", "paginas", "acessos.html"));
 });
+// Campanhas e brindes: código da franqueadora para ver todas as unidades (valor em CAMP_CODIGO_REDE, no Railway)
+const tentativasCodigo = new Map();
+app.post("/api/campanhas/rede", json2mb, async (req, res) => {
+  if (!req.gv.master) return res.status(403).json({ code: "forbidden", message: "Somente a franqueadora vê todas as unidades." });
+  const certo = String(process.env.CAMP_CODIGO_REDE || "");
+  if (!certo) return res.status(503).json({ code: "unavailable", message: "O código da franqueadora ainda não foi configurado no servidor." });
+  const k = req.sessao.idHash, agora = Date.now();
+  const lista = (tentativasCodigo.get(k) || []).filter(t => agora - t < 15 * 60 * 1000);
+  if (lista.length >= 5) return res.status(429).json({ code: "rate_limited", message: "Muitas tentativas. Aguarde 15 minutos." });
+  const dig = String((req.body || {}).codigo || "").trim();
+  const a = crypto.createHash("sha256").update(dig).digest(), b = crypto.createHash("sha256").update(certo).digest();
+  if (!crypto.timingSafeEqual(a, b)) { lista.push(agora); tentativasCodigo.set(k, lista); return res.status(403).json({ code: "codigo_errado", message: "Código incorreto." }); }
+  tentativasCodigo.delete(k);
+  await auth.liberarRedeCamp(k);
+  res.json({ ok: true });
+});
 app.use("/api", (req, res) => res.status(404).json({ code: "not_found", message: "Rota inexistente." }));
 
 // ---------- app (só public/) ----------
@@ -211,7 +228,7 @@ app.get(["/", "/index.html"], (req, res) => {
 });
 // Campanhas e brindes (aberta dentro do GeoVenda, em Medir)
 app.get(["/campanhas", "/campanhas.html"], async (req, res) => {
-  try { await db.garantirUnidadesCampanha(req.gv); } catch (e) { console.error("garantirUnidadesCampanha falhou:", e.message); }
+  if (!req.gv.master || req.gv.redeCamp) try { await db.garantirUnidadesCampanha(req.gv); } catch (e) { console.error("garantirUnidadesCampanha falhou:", e.message); }
   res.set({ "Cache-Control": "private, no-store", "Content-Type": "text/html; charset=utf-8" }).send(paginaComSessao("campanhas.html", req.gv));
 });
 // D2: master (role 2) só recebe os dados da UF da unidade dele; franqueador recebe todas

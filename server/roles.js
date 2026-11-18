@@ -10,6 +10,7 @@ export const PAPEIS = {
 };
 
 export const MSG_SEM_ACESSO = "Seu acesso ao GeoVenda ainda não foi liberado. Fale com o franqueador.";
+export const MSG_CODIGO_REDE = "Digite o código da franqueadora para ver o resultado de todas as unidades.";
 export const MSG_SEM_UF = "Sua unidade ainda não tem estado configurado. Fale com o franqueador.";
 
 // e-mails de franqueador definidos no Railway (GV_FRANQUEADORES) entram sempre como franqueador

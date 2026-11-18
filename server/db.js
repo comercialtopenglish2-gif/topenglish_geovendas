@@ -78,7 +78,7 @@ export function pode(id, seg, op) {
   if (COMPARTILHADAS.has(raiz)) return true; // comportamento atual: compartilhado entre todos os usuários logados
   if (CAMP_UNIDADE.has(raiz)) {
     if (seg.length !== 1 && seg.length !== 2) return false;
-    if (id.master) return true;
+    if (id.master) return !!id.redeCamp;                  // franqueador: só depois de digitar o código da rede
     if (raiz === "participacoes") return true;            // escrita conferida documento a documento (exigirDonoCamp)
     return op !== "write";                                // unidades e estoque: master só lê (o que é dele)
   }
@@ -86,6 +86,7 @@ export function pode(id, seg, op) {
 }
 
 function exigir(id, seg, op) {
+  if (id && id.master && !id.redeCamp && CAMP_UNIDADE.has(seg[0])) throw new ErroDb("codigo_rede", "Digite o código da franqueadora para ver todas as unidades.", 403);
   if (!pode(id, seg, op)) throw new ErroDb("permission_denied", "Sem permissão para este dado.", 403);
 }
 

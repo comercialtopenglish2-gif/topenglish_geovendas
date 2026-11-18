@@ -100,7 +100,13 @@ const api = (cookie, method, caminho, body) => req(caminho, { cookie, method, bo
   ok("campanha migrada aparece", ((await db(rj.cookie, "list", { path: "campanhas" })).json || {}).docs?.some(d => d.id === "black-friday-2026"));
   ok("master não cria campanha", (await db(rj.cookie, "set", { path: "campanhas/x", data: { nome: "X" } })).status === 403);
   ok("franqueador cria campanha", (await db(f.cookie, "set", { path: "campanhas/natal", data: { nome: "Natal", inicio: "2026-12-01", fim: "2026-12-24" } })).status === 200);
-  await req("/campanhas", { cookie: f.cookie });
+  const COD = process.env.CAMP_CODIGO_REDE || "4321";
+  const semCod = await db(f.cookie, "list", { path: "participacoes" });
+  ok("franqueador sem código não vê as unidades", semCod.status === 403 && semCod.json.code === "codigo_rede", JSON.stringify(semCod.json));
+  ok("tela de campanhas pede o código", /"redeCamp":false/.test((await req("/campanhas", { cookie: f.cookie })).txt));
+  ok("master não usa o código da rede", (await api(rj.cookie, "POST", "/api/campanhas/rede", { codigo: COD })).status === 403);
+  ok("código errado recusado", (await api(f.cookie, "POST", "/api/campanhas/rede", { codigo: "0000" })).status === 403);
+  ok("código certo libera a rede", (await api(f.cookie, "POST", "/api/campanhas/rede", { codigo: COD })).status === 200 && /"redeCamp":true/.test((await req("/campanhas", { cookie: f.cookie })).txt));
   const unis = (await db(rj.cookie, "list", { path: "unidades" })).json;
   ok("master vê só a unidade dele em campanhas", unis.docs.length === 1 && unis.docs[0].id === "u7", JSON.stringify(unis.docs.map(d => d.id)));
   ok("franqueador vê as unidades da rede", ((await db(f.cookie, "list", { path: "unidades" })).json.docs || []).length >= 2);
