@@ -330,6 +330,13 @@ header.top{top:env(safe-area-inset-top,0px)}
 .gv-nav > .gv-grp:first-child{border-top:0;padding-top:0;margin-top:6px}
 .gv-grp .gv-n{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#FFB400;color:#0B2A55;font:800 12px/22px var(--f-body);letter-spacing:0;text-align:center}
 .gv-grp .gv-n-txt{font-size:10.5px;text-transform:none}
+/* grupos do menu que abrem e fecham */
+.gv-grp[role="button"]{cursor:pointer;user-select:none;border-radius:8px;padding-right:6px}
+.gv-grp[role="button"]:hover{background:rgba(255,255,255,.08)}
+.gv-grp[role="button"]:focus-visible{outline:2px solid #FFB400;outline-offset:2px}
+.gv-grp .gv-chev{margin-left:auto;flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s;opacity:.85}
+.gv-grp[aria-expanded="false"] .gv-chev{transform:rotate(-90deg)}
+.gv-nav button.gv-fechado{display:none!important}
 .gv-brand-top{flex-direction:column;align-items:stretch;gap:10px;padding:0 4px 6px}
 .gv-toplogo{display:block;background:#FFFFFF;border-radius:12px;padding:10px 12px;box-shadow:0 6px 18px -10px rgba(0,0,0,.45)}
 .gv-toplogo img{display:block;width:100%;height:auto}
@@ -7745,6 +7752,20 @@ let t0="light"; try{ t0=localStorage.getItem("gv_tema")||"light"; }catch(e){} if
 tema(t0);
 try{ if(window.VENDEDOR&&VENDEDOR.alertaAgora) VENDEDOR.alertaAgora(); else if(window.VENDEDOR&&VENDEDOR.badge) GV.badge(VENDEDOR.badge()); }catch(e){}
 document.querySelectorAll(".gv-seg button").forEach(b=>b.onclick=()=>tema(b.dataset.t));
+// grupos do menu: clicar no título recolhe ou mostra os itens (fica salvo neste navegador)
+const GRUPOS=[]; let fechados={}; try{ fechados=JSON.parse(localStorage.getItem("gv_menu_fechados")||"{}")||{}; }catch(e){}
+document.querySelectorAll("#gvNav .gv-grp").forEach(g=>{
+  const itens=[]; let n=g.nextElementSibling; while(n&&!n.classList.contains("gv-grp")){ if(n.tagName==="BUTTON") itens.push(n); n=n.nextElementSibling; }
+  const chave=g.textContent.trim();
+  g.setAttribute("role","button"); g.tabIndex=0;
+  g.insertAdjacentHTML("beforeend",'<svg class="gv-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>');
+  const aplicar=aberto=>{ g.setAttribute("aria-expanded",String(aberto)); itens.forEach(b=>b.classList.toggle("gv-fechado",!aberto)); };
+  const alternar=()=>{ const aberto=g.getAttribute("aria-expanded")!=="true"; aplicar(aberto); if(aberto) delete fechados[chave]; else fechados[chave]=1; try{ localStorage.setItem("gv_menu_fechados",JSON.stringify(fechados)); }catch(e){} };
+  g.onclick=alternar; g.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); alternar(); } };
+  aplicar(!fechados[chave]); GRUPOS.push({g,itens,aplicar});
+});
+// o grupo da tela aberta nunca fica escondido
+const pintar=paint; paint=function(){ pintar(); const at=document.querySelector('#gvNav button[aria-current="page"]'); if(at&&at.classList.contains("gv-fechado")){ const gr=GRUPOS.find(x=>x.itens.includes(at)); if(gr) gr.aplicar(true); } };
 paint();
 })();
 </script>
