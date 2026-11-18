@@ -192,12 +192,19 @@ export async function criarSessao(res, { pessoaId, email, token, exp }) {
 export async function lerSessao(req) {
   const id = lerCookie(req, COOKIE);
   if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
-  const r = await getPool().query("SELECT pessoa_id, email, token, rede_camp FROM sessoes WHERE id_hash=$1 AND expira_em > now()", [sha(id)]);
-  return r.rows[0] ? { pessoaId: r.rows[0].pessoa_id, email: r.rows[0].email, token: r.rows[0].token, redeCamp: !!r.rows[0].rede_camp, idHash: sha(id) } : null;
+  const r = await getPool().query("SELECT pessoa_id, email, token, rede_camp, camp_unidade FROM sessoes WHERE id_hash=$1 AND expira_em > now()", [sha(id)]);
+  return r.rows[0] ? { pessoaId: r.rows[0].pessoa_id, email: r.rows[0].email, token: r.rows[0].token, redeCamp: !!r.rows[0].rede_camp, campUnidade: !!r.rows[0].camp_unidade, idHash: sha(id) } : null;
 }
 // Campanhas e brindes: libera a visão da rede toda nesta sessão (só para quem digitou o código certo)
 export async function liberarRedeCamp(idHash) {
-  await getPool().query("UPDATE sessoes SET rede_camp=true WHERE id_hash=$1", [idHash]);
+  await getPool().query("UPDATE sessoes SET rede_camp=true, camp_unidade=false WHERE id_hash=$1", [idHash]);
+}
+// Campanhas e brindes: o franqueador escolhe entrar como Unidade, ou volta para a escolha
+export async function escolherUnidadeCamp(idHash) {
+  await getPool().query("UPDATE sessoes SET rede_camp=false, camp_unidade=true WHERE id_hash=$1", [idHash]);
+}
+export async function sairVisaoCamp(idHash) {
+  await getPool().query("UPDATE sessoes SET rede_camp=false, camp_unidade=false WHERE id_hash=$1", [idHash]);
 }
 export async function encerrarSessao(req) {
   const id = lerCookie(req, COOKIE);

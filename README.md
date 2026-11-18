@@ -56,7 +56,7 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 | `escolas/<espaço>/…` (GeoFunil) | espaço `unit-<unit_id>` da unidade; franqueador acessa todos |
 | `vendedor/*`, `config/*`, `fontes/*` | todos leem; só o franqueador escreve |
 | `campanhas` (Campanhas e brindes) | todos leem; só o franqueador cria e edita |
-| `unidades`, `participacoes`, `estoque` (Campanhas e brindes) | franqueador vê e altera tudo depois de digitar o código da franqueadora (`CAMP_CODIGO_REDE`, vale até sair do sistema); o master só vê o que é da unidade dele (`u<unit_id>`), lança e edita alunos dela e não mexe no estoque |
+| `unidades`, `participacoes`, `estoque` (Campanhas e brindes) | franqueador escolhe entrar como Unidade (só a unidade da conta dele) ou como Franqueadora (tudo, depois de digitar o código `CAMP_CODIGO_REDE`; vale até sair do sistema ou trocar); o master só vê o que é da unidade dele (`u<unit_id>`), lança e edita alunos dela e não mexe no estoque |
 | `pedidos`, `relatorios`, `monitor`, `horarios`, `proprios`, `dicas`, `palavras` | compartilhados entre todos os logados (como no Claude) |
 | qualquer outro caminho | bloqueado |
 

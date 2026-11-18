@@ -45,11 +45,12 @@ const COMPARTILHADAS = new Set(["pedidos", "relatorios", "monitor", "horarios", 
 const GLOBAIS_MASTER_ESCREVE = new Set(["config", "fontes", "vendedor", "campanhas"]);
 // Campanhas e brindes: o master só vê e lança o que é da unidade dele (u<unitId>); o franqueador vê tudo
 const CAMP_UNIDADE = new Set(["unidades", "participacoes", "estoque"]);
-export const unidadeCampanha = id => (id && id.unitId != null ? "u" + id.unitId : null);
+// escopo em Campanhas e brindes (id.campEscopo): "rede" (franqueadora com código), "u<unitId>" (uma unidade) ou null (ainda não escolheu)
+export const unidadeCampanha = id => (id && id.campEscopo && id.campEscopo !== "rede" ? id.campEscopo : null);
 // dono de um documento das coleções de campanha: unidades -> o próprio id; participacoes/estoque -> campo unidadeId
 const donoCamp = (col, docId, dados) => col === "unidades" ? docId : (dados && dados.unidadeId) || null;
 function exigirDonoCamp(id, seg, dadosNovos, dadosAtuais) {
-  if (id.master || !CAMP_UNIDADE.has(seg[0])) return;
+  if (id.campEscopo === "rede" || !CAMP_UNIDADE.has(seg[0])) return;
   const minha = unidadeCampanha(id), docId = seg[seg.length - 1];
   const ok = (d, existe) => !existe || donoCamp(seg[0], docId, d) === minha;
   if (!minha || !ok(dadosNovos, dadosNovos !== undefined) || !ok(dadosAtuais, dadosAtuais != null))
@@ -78,7 +79,8 @@ export function pode(id, seg, op) {
   if (COMPARTILHADAS.has(raiz)) return true; // comportamento atual: compartilhado entre todos os usuários logados
   if (CAMP_UNIDADE.has(raiz)) {
     if (seg.length !== 1 && seg.length !== 2) return false;
-    if (id.master) return !!id.redeCamp;                  // franqueador: só depois de digitar o código da rede
+    if (id.campEscopo === "rede") return true;            // franqueadora: só depois de digitar o código da rede
+    if (!id.campEscopo) return false;                     // ainda não escolheu como entrar
     if (raiz === "participacoes") return true;            // escrita conferida documento a documento (exigirDonoCamp)
     return op !== "write";                                // unidades e estoque: master só lê (o que é dele)
   }
@@ -86,7 +88,7 @@ export function pode(id, seg, op) {
 }
 
 function exigir(id, seg, op) {
-  if (id && id.master && !id.redeCamp && CAMP_UNIDADE.has(seg[0])) throw new ErroDb("codigo_rede", "Digite o código da franqueadora para ver todas as unidades.", 403);
+  if (id && !id.campEscopo && CAMP_UNIDADE.has(seg[0])) throw new ErroDb(id.master ? "escolher_visao" : "permission_denied", id.master ? "Escolha entrar como Unidade ou como Franqueadora." : "Sem unidade para as campanhas.", 403);
   if (!pode(id, seg, op)) throw new ErroDb("permission_denied", "Sem permissão para este dado.", 403);
 }
 
@@ -117,7 +119,7 @@ export async function listar(id, p, where, desde) {
   // franqueador listando a raiz "escolas"/"equipe": tudo; os demais já foram barrados acima
   const docs = r.rows.map(x => ({ id: x.path.split("/").pop(), data: x.dados }))
     .filter(d => pode(id, [...s, d.id], "read"))
-    .filter(d => id.master || !CAMP_UNIDADE.has(s[0]) || donoCamp(s[0], d.id, d.data) === unidadeCampanha(id));
+    .filter(d => id.campEscopo === "rede" || !CAMP_UNIDADE.has(s[0]) || donoCamp(s[0], d.id, d.data) === unidadeCampanha(id));
   return { token, docs };
 }
 
@@ -131,7 +133,7 @@ export async function setDoc(id, p, dados) {
   const s = partes(p); if (!ehDoc(s)) throw new ErroDb("invalid_argument", "Caminho de documento inválido.");
   exigir(id, s, "write");
   if (!dados || typeof dados !== "object" || Array.isArray(dados)) throw new ErroDb("invalid_argument", "Documento inválido.");
-  if (!id.master && CAMP_UNIDADE.has(s[0])) {
+  if (id.campEscopo !== "rede" && CAMP_UNIDADE.has(s[0])) {
     const atual = await getPool().query("SELECT dados FROM docs WHERE path=$1", [p]);
     exigirDonoCamp(id, s, dados, atual.rows[0] ? atual.rows[0].dados : null);
   }
@@ -157,7 +159,7 @@ export async function updateDoc(id, p, campos) {
 export async function delDoc(id, p) {
   const s = partes(p); if (!ehDoc(s)) throw new ErroDb("invalid_argument", "Caminho de documento inválido.");
   exigir(id, s, "write");
-  if (!id.master && CAMP_UNIDADE.has(s[0])) {
+  if (id.campEscopo !== "rede" && CAMP_UNIDADE.has(s[0])) {
     const atual = await getPool().query("SELECT dados FROM docs WHERE path=$1", [p]);
     exigirDonoCamp(id, s, undefined, atual.rows[0] ? atual.rows[0].dados : null);
   }
@@ -173,10 +175,13 @@ export async function garantirUnidadesCampanha(id) {
     `INSERT INTO docs(path, colecao, dados, versao, autor) VALUES ($1,'unidades',$2::jsonb,nextval('docs_versao_seq'),'geovenda')
      ON CONFLICT (path) DO NOTHING`,
     ["unidades/u" + unitId, JSON.stringify({ nome: nome || "Unidade " + unitId, cidade: cidade || "", cmsUnitId: Number(unitId), criadoEm: Date.now() })]);
-  if (id.master) {
+  if (id.campEscopo === "rede") {
     const r = await getPool().query("SELECT unit_id, nome, cidade FROM unidades WHERE unit_id < 1000 OR unit_id IN (SELECT unit_id FROM pessoas WHERE unit_id IS NOT NULL)");
     for (const u of r.rows) await ins(u.unit_id, u.nome, u.cidade);
-  } else if (id.unitId != null) await ins(id.unitId, id.unidade, id.cidade);
+  } else if (id.campEscopo) {
+    const un = id.unidadePropria || {};
+    await ins(id.campEscopo.slice(1), un.nome || id.unidade, un.cidade || id.cidade);
+  }
 }
 
 // ---------- pessoas, unidades e acessos ----------

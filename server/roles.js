@@ -42,6 +42,7 @@ export function identidade(sessao, acesso, nome) {
     unidade: unitId && acesso ? acesso.unidade_nome || null : null,
     uf: p.todosEstados ? null : uf,
     cidade: unitId && acesso ? acesso.cidade || null : null,
+    unidadePropria: unitId ? { id: unitId, nome: (acesso && acesso.unidade_nome) || null, cidade: (acesso && acesso.cidade) || null } : null,
     pendente,
     motivoPendente: pendente ? MSG_SEM_UF : null,
   };
@@ -87,6 +88,7 @@ export function identidadeAdmin(me, dePara) {
     unidade: p.todosEstados ? null : ((dePara && dePara.nome) || unit.name || null),
     uf: p.todosEstados ? null : uf,
     cidade: p.todosEstados ? null : ((dePara && dePara.cidade) || unit.city || null),
+    unidadePropria: unitId ? { id: unitId, nome: (dePara && dePara.nome) || unit.name || null, cidade: (dePara && dePara.cidade) || unit.city || null } : null,
     pendente,
     motivoPendente: pendente ? MSG_SEM_UF : null,
   };

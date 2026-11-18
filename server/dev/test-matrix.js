@@ -102,7 +102,13 @@ const api = (cookie, method, caminho, body) => req(caminho, { cookie, method, bo
   ok("franqueador cria campanha", (await db(f.cookie, "set", { path: "campanhas/natal", data: { nome: "Natal", inicio: "2026-12-01", fim: "2026-12-24" } })).status === 200);
   const COD = process.env.CAMP_CODIGO_REDE || "4321";
   const semCod = await db(f.cookie, "list", { path: "participacoes" });
-  ok("franqueador sem código não vê as unidades", semCod.status === 403 && semCod.json.code === "codigo_rede", JSON.stringify(semCod.json));
+  ok("franqueador sem escolher não vê as unidades", semCod.status === 403 && semCod.json.code === "escolher_visao", JSON.stringify(semCod.json));
+  ok("master não escolhe visão de unidade", (await api(rj.cookie, "POST", "/api/campanhas/unidade")).status === 400);
+  ok("franqueador entra como Unidade (a da conta no CMS)", (await api(f.cookie, "POST", "/api/campanhas/unidade")).status === 200 && (await api(f.cookie, "GET", "/api/session")).json.campEscopo === "u1");
+  await req("/campanhas", { cookie: f.cookie });
+  ok("como Unidade vê só a unidade dele", ((await db(f.cookie, "list", { path: "unidades" })).json.docs || []).map(d => d.id).join() === "u1");
+  ok("como Unidade não lança para outra unidade", (await db(f.cookie, "set", { path: "participacoes/px", data: { aluno: "X", unidadeId: "u7" } })).status === 403);
+  ok("trocar visão volta para a escolha", (await api(f.cookie, "POST", "/api/campanhas/sair")).status === 200 && (await db(f.cookie, "list", { path: "participacoes" })).status === 403);
   ok("tela de campanhas pede o código", /"redeCamp":false/.test((await req("/campanhas", { cookie: f.cookie })).txt));
   ok("master não usa o código da rede", (await api(rj.cookie, "POST", "/api/campanhas/rede", { codigo: COD })).status === 403);
   ok("código errado recusado", (await api(f.cookie, "POST", "/api/campanhas/rede", { codigo: "0000" })).status === 403);

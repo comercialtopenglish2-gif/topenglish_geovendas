@@ -254,7 +254,8 @@ const LS = { get(k, d) { try { const v = localStorage.getItem('geobrinde:' + k);
 /* ---------- estado ---------- */
 /* GeoVenda: o master fica preso à unidade dele (u<id da unidade no CMS); o franqueador vê a rede toda */
 const GVS = window.GV_SESSION || null;
-const MASTER_UNIT = GVS && !GVS.master && GVS.unidade && GVS.unidade.id != null ? 'u' + GVS.unidade.id : null;
+// escopo vindo do servidor: 'rede' (franqueadora com código), 'u<id>' (uma unidade) ou null (franqueador ainda não escolheu)
+const MASTER_UNIT = GVS && GVS.campEscopo && GVS.campEscopo !== 'rede' ? GVS.campEscopo : null;
 if (MASTER_UNIT) document.documentElement.classList.add('gvmaster');
 const S = { camps: {}, units: {}, parts: {}, stock: {}, loaded: { c: false, u: false, p: false, s: false }, db: null, user: null, uid: null, canWrite: true, campId: LS.get('camp', ''), unitId: MASTER_UNIT || LS.get('unit', ''), view: 'painel', sel: new Set() };
 const TIPOS = ['Matrícula', 'Grupo aberto'];
@@ -301,7 +302,8 @@ function metrics(c, unitId) {
 async function boot() {
   render();
   const loadTimer = setTimeout(() => { if (!Object.values(S.loaded).every(Boolean)) banner('Não foi possível carregar os dados ainda. Verifique a conexão; o app continua tentando sozinho.'); }, 10000);
-  if (GVS && GVS.master && !GVS.redeCamp) { clearTimeout(loadTimer); cadeadoRede(); return; }
+  if (GVS && GVS.master && !GVS.campEscopo) { clearTimeout(loadTimer); escolherVisao(); return; }
+  if (GVS && GVS.master) botaoTrocarVisao();
   const db = typeof claude === 'undefined' ? null : await claude.use('db');
   if (!db) { clearTimeout(loadTimer); banner('Entre na sua conta Claude para ver e lançar os dados da campanha.'); return; }
   S.db = db;
@@ -349,37 +351,62 @@ function unitList() { return Object.values(S.units).sort((a, b) => (a.nome || ''
 function unitName(id) { return S.units[id]?.nome || 'Unidade não cadastrada'; }
 function fillSelect(sel, opts, value) { const cur = [...sel.options].map(o => o.value + '|' + o.text).join(';'); const nxt = opts.map(o => o[0] + '|' + o[1]).join(';'); if (cur !== nxt) { sel.replaceChildren(...opts.map(([v, t]) => el('option', { value: v, text: t }))); } sel.value = value; }
 
-/* ---------- GeoVenda: código da franqueadora para ver todas as unidades ---------- */
-function cadeadoRede() {
+/* ---------- GeoVenda: entrar como Unidade ou como Franqueadora (com código) ---------- */
+async function postVisao(url, corpo) {
+  const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+  if (r.status === 401) { top.location.href = '/login'; throw new Error('login'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.message || 'Não foi possível concluir.');
+  return j;
+}
+function escolherVisao() {
   document.querySelectorAll('.view, #tabs, .ctx').forEach(x => x.style.display = 'none');
+  const un = GVS.unidadePropria;
   const box = document.createElement('section');
-  box.className = 'panel'; box.id = 'cadeado';
-  box.setAttribute('style', 'max-width:440px;margin:40px auto;text-align:center;display:flex;flex-direction:column;gap:12px');
-  box.innerHTML = '<h2 style="margin:0">Visão da franqueadora</h2><p class="sub" style="margin:0">Para ver o resultado de todas as unidades, digite o código da franqueadora.</p>' +
-    '<input id="codRede" type="password" inputmode="numeric" autocomplete="off" placeholder="Código" style="text-align:center;font-size:20px;letter-spacing:.3em;padding:10px">' +
-    '<p id="codMsg" class="sub" role="alert" style="margin:0;color:#C8102E"></p><button class="btn pri" id="codOk" type="button">Entrar</button>';
+  box.id = 'escolha';
+  box.setAttribute('style', 'max-width:760px;margin:32px auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px');
+  box.innerHTML =
+    '<h2 style="grid-column:1/-1;margin:0;text-align:center">Como você quer entrar?</h2>' +
+    '<div class="panel" style="display:flex;flex-direction:column;gap:10px;margin:0"><h3 style="margin:0">Como Unidade</h3>' +
+      '<p class="sub" style="margin:0">Vê e lança só os alunos da sua unidade' + (un && un.nome ? ': <b></b>' : '') + '.</p>' +
+      '<p class="sub" id="uMsg" role="alert" style="margin:0;color:#C8102E"></p>' +
+      '<button class="btn" id="uOk" type="button"' + (un ? '' : ' disabled') + '>' + (un ? 'Entrar como Unidade' : 'Conta sem unidade no sistema') + '</button></div>' +
+    '<div class="panel" style="display:flex;flex-direction:column;gap:10px;margin:0"><h3 style="margin:0">Como Franqueadora</h3>' +
+      '<p class="sub" style="margin:0">Vê o resultado de todas as unidades. Precisa do código da franqueadora.</p>' +
+      '<input id="codRede" type="password" inputmode="numeric" autocomplete="off" placeholder="Código" style="text-align:center;font-size:20px;letter-spacing:.3em;padding:10px">' +
+      '<p class="sub" id="codMsg" role="alert" style="margin:0;color:#C8102E"></p>' +
+      '<button class="btn pri" id="codOk" type="button">Entrar como Franqueadora</button></div>';
+  if (un && un.nome) box.querySelector('b').textContent = un.nome;
   document.querySelector('main').prepend(box);
   const inp = box.querySelector('#codRede'), msg = box.querySelector('#codMsg'), btn = box.querySelector('#codOk');
-  const enviar = async () => {
+  const comoRede = async () => {
     if (!inp.value.trim()) { inp.focus(); return; }
     btn.disabled = true; msg.textContent = '';
-    try {
-      const r = await fetch('/api/campanhas/rede', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo: inp.value }) });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok) { location.reload(); return; }
-      if (r.status === 401) { top.location.href = '/login'; return; }
-      msg.textContent = j.message || 'Não foi possível conferir o código.'; inp.value = ''; inp.focus();
-    } catch (e) { msg.textContent = 'Sem conexão. Tente de novo.'; }
+    try { await postVisao('/api/campanhas/rede', { codigo: inp.value }); location.reload(); return; }
+    catch (e) { if (e.message !== 'login') { msg.textContent = e.message; inp.value = ''; inp.focus(); } }
     btn.disabled = false;
   };
-  btn.onclick = enviar; inp.onkeydown = e => { if (e.key === 'Enter') enviar(); };
-  setTimeout(() => inp.focus(), 50);
+  btn.onclick = comoRede; inp.onkeydown = e => { if (e.key === 'Enter') comoRede(); };
+  box.querySelector('#uOk').onclick = async e => {
+    e.target.disabled = true;
+    try { await postVisao('/api/campanhas/unidade'); location.reload(); }
+    catch (x) { if (x.message !== 'login') { box.querySelector('#uMsg').textContent = x.message; e.target.disabled = false; } }
+  };
+}
+function botaoTrocarVisao() {
+  const ctx = document.querySelector('.ctx'); if (!ctx || document.getElementById('trocaVisao')) return;
+  const b = document.createElement('button');
+  b.id = 'trocaVisao'; b.type = 'button'; b.className = 'btn';
+  b.textContent = GVS.campEscopo === 'rede' ? 'Sair da visão da franqueadora' : 'Trocar para Franqueadora';
+  b.setAttribute('style', 'align-self:flex-end');
+  b.onclick = async () => { b.disabled = true; try { await postVisao('/api/campanhas/sair'); location.reload(); } catch (e) { b.disabled = false; } };
+  ctx.appendChild(b);
 }
 
 /* ---------- resumo para o assistente do GeoVenda ---------- */
 window.GV_CAMP_RESUMO = function () {
   try {
-    if (GVS && GVS.master && !GVS.redeCamp) return 'Visão da franqueadora bloqueada: falta digitar o código da franqueadora na tela de campanhas.';
+    if (GVS && GVS.master && !GVS.campEscopo) return 'O franqueador ainda não escolheu entrar como Unidade ou como Franqueadora na tela de campanhas.';
     const c = currentCamp(); if (!c) return 'Nenhuma campanha cadastrada.';
     const m = metrics(c, S.unitId || '');
     const linhas = [`Campanha: ${c.nome} (${c.inicio || '?'} a ${c.fim || '?'}), brinde: ${c.brinde || '—'}, status: ${campStatus(c)[0]}.`,

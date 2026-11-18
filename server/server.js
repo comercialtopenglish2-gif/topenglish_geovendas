@@ -123,7 +123,10 @@ app.use(async (req, res, next) => {
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(msgBloq, true));
     return res.status(403).json({ code: "forbidden", message: msgBloq });
   }
-  id.redeCamp = !!(id.master && sessao.redeCamp);
+  // Campanhas e brindes: master sempre na unidade dele; franqueador escolhe Unidade (a da conta) ou Franqueadora (com código)
+  id.campEscopo = !id.master ? (id.unitId != null ? "u" + id.unitId : null)
+    : sessao.redeCamp ? "rede" : (sessao.campUnidade && id.unidadePropria ? "u" + id.unidadePropria.id : null);
+  id.redeCamp = id.campEscopo === "rede";
   req.gv = id; req.sessao = sessao;
   if (id.pendente && req.path !== "/api/session" && req.path !== "/claude-shim.js") {
     if (querHtml(req)) return res.status(403).type("html").send(paginaAviso(id.motivoPendente, true));
@@ -138,7 +141,8 @@ const sessaoPublica = id => ({
   pessoa: { id: id.pessoaId, nome: id.nome || id.email, email: id.email },
   papel: id.papel, rotulo: id.rotulo, master: id.master, editaBase: id.editaBase,
   unidade: { id: id.unitId, nome: id.unidade, uf: id.uf, cidade: id.cidade },
-  espaco: id.espaco, pendente: id.pendente, redeCamp: !!id.redeCamp,
+  espaco: id.espaco, pendente: id.pendente, redeCamp: !!id.redeCamp, campEscopo: id.campEscopo || null,
+  unidadePropria: id.master && id.unidadePropria ? { id: id.unidadePropria.id, nome: id.unidadePropria.nome } : null,
   ia: ai.iaLigada(),
 });
 app.get("/api/session", (req, res) => res.set("Cache-Control", "no-store").json(sessaoPublica(req.gv)));
@@ -212,6 +216,16 @@ app.post("/api/campanhas/rede", json2mb, async (req, res) => {
   await auth.liberarRedeCamp(k);
   res.json({ ok: true });
 });
+app.post("/api/campanhas/unidade", async (req, res) => {
+  if (!req.gv.master) return res.status(400).json({ code: "invalid_argument", message: "Você já entra como a sua unidade." });
+  if (!req.gv.unidadePropria) return res.status(400).json({ code: "invalid_argument", message: "Esta conta não tem unidade no sistema da Top English." });
+  await auth.escolherUnidadeCamp(req.sessao.idHash);
+  res.json({ ok: true });
+});
+app.post("/api/campanhas/sair", async (req, res) => {
+  if (req.gv.master) await auth.sairVisaoCamp(req.sessao.idHash);
+  res.json({ ok: true });
+});
 app.use("/api", (req, res) => res.status(404).json({ code: "not_found", message: "Rota inexistente." }));
 
 // ---------- app (só public/) ----------
@@ -228,7 +242,7 @@ app.get(["/", "/index.html"], (req, res) => {
 });
 // Campanhas e brindes (aberta dentro do GeoVenda, em Medir)
 app.get(["/campanhas", "/campanhas.html"], async (req, res) => {
-  if (!req.gv.master || req.gv.redeCamp) try { await db.garantirUnidadesCampanha(req.gv); } catch (e) { console.error("garantirUnidadesCampanha falhou:", e.message); }
+  if (req.gv.campEscopo) try { await db.garantirUnidadesCampanha(req.gv); } catch (e) { console.error("garantirUnidadesCampanha falhou:", e.message); }
   res.set({ "Cache-Control": "private, no-store", "Content-Type": "text/html; charset=utf-8" }).send(paginaComSessao("campanhas.html", req.gv));
 });
 // D2: master (role 2) só recebe os dados da UF da unidade dele; franqueador recebe todas
