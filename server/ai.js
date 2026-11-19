@@ -9,6 +9,8 @@ const MODELOS = {
   default: process.env.AI_MODEL_DEFAULT || "claude-sonnet-5-5",
   complex: process.env.AI_MODEL_COMPLEX || "claude-sonnet-5-5",
 };
+// Se o modelo configurado não existir mais na conta, tenta estes em ordem (pode trocar por AI_MODEL_FALLBACK, separados por vírgula)
+const RESERVA = (process.env.AI_MODEL_FALLBACK || "claude-sonnet-5-5,claude-haiku-5-5,claude-sonnet-4-5,claude-haiku-4-5").split(",").map(x => x.trim()).filter(Boolean);
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS || 8000);
 const LIMITE_DIA = Number(process.env.AI_DAILY_CALLS || 150);
 export const MAX_PROMPT_BYTES = 262144;
@@ -58,6 +60,53 @@ function montarMensagens(input, imagens) {
   return out;
 }
 
+// Lê o erro da Anthropic e devolve {status, code, message} em português, sem expor a chave
+async function motivo(up, modelo) {
+  let tipo = "", msg = "";
+  try { const j = JSON.parse(await up.text()); tipo = (j.error && j.error.type) || ""; msg = String((j.error && j.error.message) || ""); } catch {}
+  console.error(`IA: a Anthropic respondeu HTTP ${up.status} (${tipo || "sem tipo"}) com o modelo ${modelo}: ${msg.slice(0, 300)}`);
+  if (up.status === 401) return { status: 502, code: "unavailable", message: "A chave da IA no servidor foi recusada pela Anthropic. Confira a variável ANTHROPIC_API_KEY no Railway." };
+  if (up.status === 403) return { status: 502, code: "unavailable", message: "A conta da Anthropic não tem permissão para este uso. Confira a conta e a chave no console da Anthropic." };
+  if (/credit balance|billing|purchase credits/i.test(msg)) return { status: 502, code: "unavailable", message: "Os créditos da conta da Anthropic acabaram. Recarregue em console.anthropic.com (Billing) e tente de novo." };
+  if (up.status === 404 || tipo === "not_found_error") return { status: 502, code: "model_not_found", message: `O modelo de IA "${modelo}" não foi encontrado na conta. Ajuste AI_MODEL_DEFAULT no Railway.` };
+  if (up.status === 413 || /prompt is too long|too many tokens|exceeds/i.test(msg)) return { status: 413, code: "prompt_too_large", message: "Há dados demais para uma pergunta só. Remova arquivos anexados ou pergunte sobre um período menor." };
+  if (up.status === 429 || up.status === 529 || tipo === "overloaded_error" || tipo === "rate_limit_error") return { status: 429, code: "rate_limited", message: "A IA está sobrecarregada agora. Espere alguns segundos e tente de novo." };
+  if (up.status === 400) return { status: 502, code: "invalid_argument", message: "A IA recusou o formato do pedido. Tente de novo; se continuar, avise o suporte do GeoVenda." };
+  return { status: 502, code: "unavailable", message: "A IA não respondeu agora. Tente de novo em instantes." };
+}
+const espera = ms => new Promise(r => setTimeout(r, ms));
+async function chamar(corpoApi, signal) {
+  return fetch(API, {
+    method: "POST", signal,
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify(corpoApi),
+  });
+}
+// Tenta o modelo pedido; se ele não existir, os modelos de reserva; se a IA estiver sobrecarregada, tenta de novo uma vez
+async function chamarComReserva(base, modelo, signal) {
+  const fila = [modelo, ...RESERVA.filter(m => m !== modelo)];
+  let ultimo = null;
+  for (let i = 0; i < fila.length; i++) {
+    let up = await chamar({ ...base, model: fila[i] }, signal);
+    if (!up.ok && (up.status === 429 || up.status === 529 || up.status >= 500)) { try { await up.text(); } catch {} await espera(1500); up = await chamar({ ...base, model: fila[i] }, signal); }
+    if (up.ok) { if (i > 0) console.error(`IA: usando o modelo de reserva ${fila[i]} (o configurado não respondeu).`); return { up, modelo: fila[i] }; }
+    ultimo = await motivo(up, fila[i]);
+    if (ultimo.code !== "model_not_found") return { erro: ultimo };
+  }
+  return { erro: ultimo };
+}
+
+// Teste rápido para o franqueador: GET /api/ai/diagnostico
+export async function diagnostico(req, res) {
+  if (!iaLigada()) return res.json({ ok: false, motivo: "A variável ANTHROPIC_API_KEY não está configurada no Railway." });
+  try {
+    const r = await chamarComReserva({ max_tokens: 20, messages: [{ role: "user", content: "Responda só: ok" }] }, MODELOS.default, undefined);
+    if (r.erro) return res.json({ ok: false, motivo: r.erro.message });
+    let txt = ""; try { const j = await r.up.json(); txt = (j.content || []).map(c => c.text || "").join(""); } catch {}
+    res.json({ ok: true, modelo: r.modelo, resposta: txt.slice(0, 40) });
+  } catch (e) { res.json({ ok: false, motivo: "Não consegui falar com a Anthropic a partir do servidor." }); }
+}
+
 // POST /api/ai/sample  { input, images?, modelTier?, maxTokens? }
 // Resposta em NDJSON: {"t":"delta","text":"..."} ... {"t":"fim","text":"...","truncated":bool}
 export async function sample(req, res, ident) {
@@ -75,18 +124,12 @@ export async function sample(req, res, ident) {
   res.on("close", () => { if (!res.writableEnded) ctl.abort(); });
   let up;
   try {
-    up = await fetch(API, {
-      method: "POST", signal: ctl.signal,
-      headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODELOS[corpo.modelTier] || MODELOS.default, max_tokens: Math.min(Number(corpo.maxTokens) || MAX_TOKENS, MAX_TOKENS), messages: mensagens, stream: true }),
-    });
+    const r = await chamarComReserva({ max_tokens: Math.min(Number(corpo.maxTokens) || MAX_TOKENS, MAX_TOKENS), messages: mensagens, stream: true }, MODELOS[corpo.modelTier] || MODELOS.default, ctl.signal);
+    if (r.erro) return erro(res, r.erro.status, r.erro.code === "model_not_found" ? "unavailable" : r.erro.code, r.erro.message);
+    up = r.up;
   } catch (e) {
-    return erro(res, 502, ctl.signal.aborted ? "cancelled" : "unavailable", "Não consegui falar com a IA agora.");
-  }
-  if (!up.ok) {
-    const code = up.status === 429 || up.status === 529 ? "rate_limited" : up.status === 400 ? "invalid_argument" : "unavailable";
-    try { await up.text(); } catch {}
-    return erro(res, up.status === 429 || up.status === 529 ? 429 : 502, code, "A IA não respondeu agora. Tente de novo.");
+    if (!ctl.signal.aborted) console.error("IA: falha de rede ao chamar a Anthropic:", e && e.message);
+    return erro(res, 502, ctl.signal.aborted ? "cancelled" : "unavailable", "Não consegui falar com a IA agora. Tente de novo em instantes.");
   }
   res.status(200).set({ "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
   let texto = "", parada = null, ti = 0, to = 0, buf = "";
@@ -103,7 +146,7 @@ export async function sample(req, res, ident) {
           texto += ev.delta.text; res.write(JSON.stringify({ t: "delta", text: ev.delta.text }) + "\n");
         } else if (ev.type === "message_start" && ev.message && ev.message.usage) ti = ev.message.usage.input_tokens || 0;
         else if (ev.type === "message_delta") { if (ev.delta && ev.delta.stop_reason) parada = ev.delta.stop_reason; if (ev.usage) to = ev.usage.output_tokens || to; }
-        else if (ev.type === "error") { return erro(res, 502, "unavailable", "A IA interrompeu a resposta."); }
+        else if (ev.type === "error") { console.error("IA: erro no meio da resposta:", ev.error && ev.error.type); return erro(res, 502, "unavailable", ev.error && ev.error.type === "overloaded_error" ? "A IA está sobrecarregada agora. Espere alguns segundos e tente de novo." : "A IA interrompeu a resposta. Tente de novo."); }
       }
     }
   } catch (e) {

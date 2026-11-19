@@ -7723,10 +7723,11 @@ window.GEOFUNIL={
  show(v){ libs(); if(VIEWS.some(x=>x[0]===v)&&v!==S.view){ S.view=v; render(); window.scrollTo(0,0); } notifyView(); },
  _shown(){ libs(); render(); },
  contexto(){
-  if(!S.ready) return "GeoFunil ainda carregando.";
-  if(S.noId) return "GeoFunil: entre na conta Claude para ver os dados da escola.";
-  if(!S.unit) return "Nenhuma escola cadastrada no GeoFunil (menu Medir > Escolas).";
-  const c=buildContext(); return "Escola: "+unitName()+" · ano "+S.year+" · mês na tela: "+MESES[S.month-1]+"\nBase: "+c.base.join(" · ")+"\nDados (JSON): "+c.json;
+  if(!S.ready) return "GeoFunil ainda carregando (não significa que não há dados: peça para tentar de novo em alguns segundos).";
+  if(S.noId) return "GeoFunil: entre na conta para ver os dados da escola.";
+  if(!S.unit) return "NÃO CADASTRADO: nenhuma escola cadastrada no GeoFunil (menu Medir > Escolas). Por isso também não há equipe, funil, pesquisas nem conteúdo da escola.";
+  const eq=S.units.map(u=>{const l=equipeDe(u);return "- "+(u.nome||"(sem nome)")+[u.cidade,u.uf].filter(Boolean).join("/").replace(/^/," · ")+": "+(l.length?l.length+" colaborador(es): "+l.map(c=>c.nome+" ("+(c.funcao||"sem função")+", "+(c.ativo==="nao"?"inativo":"ativo")+(c.entrada?", desde "+c.entrada.split("-").reverse().join("/"):"")+")").join("; "):"NÃO CADASTRADO: nenhum colaborador na equipe")}).join("\n");
+  const c=buildContext(); return "ESCOLAS E EQUIPES (Medir > Escolas > Equipe da escola; vendedores ativos aparecem no Vendedor):\n"+eq+"\n\nEscola aberta: "+unitName()+" · ano "+S.year+" · mês na tela: "+MESES[S.month-1]+"\nBase: "+c.base.join(" · ")+"\nDados (JSON): "+c.json;
  }
 };
 // ---------- início ----------
@@ -8233,7 +8234,10 @@ Pense como um especialista em Growth Marketing aplicado a vendas: lente de funil
 COMO RESPONDER
 - Suas fontes são: (1) os ARQUIVOS ANEXADOS pelo usuário, quando houver, e (2) os dados internos do app, incluindo o FUNIL DA ESCOLA (GeoFunil). Use todos. Para CPL, CAC, conversão por fonte, investimento, metas, notas de pesquisa e pesquisas/conteúdos atrasados, use o FUNIL DA ESCOLA. Quando a pergunta for sobre um arquivo, responda a partir do conteúdo dele e cite o nome do arquivo (e a aba/página quando ajudar).
 - Cite leads, itens, linhas e conteúdos pelo nome real. Nunca invente leads, números ou datas. Faça contas (somas, médias, taxas de conversão, CPL, CAC) a partir dos números que aparecem nos arquivos e mostre o cálculo em uma linha.
-- Se faltar dado para responder, diga qual dado falta e onde obter (anexar outro arquivo ou cadastrar em Acompanhamento, Checklist, Agenda de conteúdo, Captação externa, Perfil, Praças).
+- PROCURE ANTES DE RESPONDER: para cada pergunta, procure a resposta em todas as seções de dados abaixo (Vendedor, Praças, Funil da escola com Escolas e equipes, Campanhas) e nos arquivos anexados. Responda só com o que está lá, citando nomes e números como aparecem.
+- DADO NÃO CADASTRADO: se o que a pessoa pediu não aparece em nenhuma seção (lista vazia, zero registros, "NÃO CADASTRADO", "sem ..." ou o assunto não existe nos dados), comece a resposta exatamente com: "Esses dados não foram cadastrados ainda para análise." Em seguida diga, em uma ou duas linhas, em qual tela cadastrar, com o botão {{abrir:...}} da tela. Não estime, não dê exemplo inventado e não preencha com dados genéricos.
+- DADO PARCIAL: se só parte existe, responda com o que existe e diga, no fim, o que ainda não foi cadastrado e onde cadastrar.
+- Seção "ainda carregando", "não aberta nesta sessão" ou "indisponível" não quer dizer que o dado não existe: diga que essa parte ainda não carregou e peça para abrir a tela indicada (ou tentar de novo em alguns segundos).
 - Ordem de prioridade padrão para demandas: 1) leads novos esperando a 1ª resposta (os acima do limite primeiro; quentes antes de mornos e frios), 2) aulas/visitas de hoje e confirmações D-1 de amanhã, 3) follow-ups atrasados, 4) follow-ups de hoje, 5) mensagens de renovação do dia e clientes com ciclo encerrado sem decisão, 5b) leads que responderam (inclusive reativados) e presenças a registrar, 6) checklist pendente, 7) conteúdo programado, 8) prospecção/captação.
 - Para preço e negociação, siga o Método Âncora (3 opções: âncora, alvo, isca) e o Método CNC de concessão: desconto é a última ferramenta, sempre com contrapartida e prazo, e só o que estiver na escada de concessão cadastrada.
 - Base de clientes: renovação é venda (valor antes de preço, 3 opções, desconto só como último degrau); ofertas para clientes só com itens do catálogo cadastrado; indicação sem prometer reconhecimento que não estiver cadastrado; reativação usa o motivo da perda.
@@ -8268,7 +8272,7 @@ ${guiaTexto()}
 ${dadosFunil()}
 
 === CAMPANHAS E BRINDES (módulo Medir) ===
-${(()=>{ try{ const w=document.getElementById("campFrame").contentWindow; return w&&w.GV_CAMP_RESUMO?w.GV_CAMP_RESUMO():"Tela de campanhas ainda não aberta nesta sessão." }catch(e){ return "Indisponível." } })()}`;
+${(()=>{ try{ const w=document.getElementById("campFrame").contentWindow; return w&&w.GV_CAMP_RESUMO?w.GV_CAMP_RESUMO():"Tela de campanhas ainda não aberta nesta sessão (os dados podem existir: peça para abrir Medir > Campanhas e brindes {{abrir:camp}} e perguntar de novo)." }catch(e){ return "Indisponível." } })()}`;
 }
 
 function addMsg(cls,html,txt){
@@ -8318,6 +8322,7 @@ function errTxt(e){ const c=e&&e.code;
   if(c==="rate_limited") return "Muitas perguntas seguidas. Espere um pouco e tente de novo.";
   if(c==="session_expired") return "Sua sessão expirou. Entre de novo no Claude.";
   if(c==="prompt_too_large") return "Os arquivos anexados ficaram grandes demais para uma pergunta. Remova algum da base e tente de novo.";
+  const m=e&&e.message; if(m&&!/^(unavailable|invalid_argument|Erro no servidor\.?|IA indisponível\.?)$/i.test(m)&&/[a-zà-ú]{3}/i.test(m)) return m;
   return "Não consegui responder agora. Tente de novo."; }
 function estado(){ const off=pronto&&!sample; $g("gaOff").hidden=!off; send.disabled=busy||off||lendo>0; send.title=lendo>0?"Aguarde a leitura dos arquivos":""; panel.querySelectorAll(".ga-per button").forEach(b=>b.disabled=(busy||off||lendo>0)&&!(off&&b.dataset.per==="aprender")); }
 
