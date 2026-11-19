@@ -5992,7 +5992,7 @@ function abrirImportar(modo, aba){
   bg.addEventListener("keydown", e => { if(e.key === "Escape") fechar() });
   const body = bg.querySelector(".imp-body"), st = bg.querySelector("[data-st]"), upd = () => bg.querySelector('[data-a="upd"]').checked;
   let cont = {novo: 0, atualizado: 0, repetido: 0};
-  const resumo = () => { st.textContent = `${cont.novo} novo${cont.novo !== 1 ? "s" : ""} · ${cont.atualizado} atualizado${cont.atualizado !== 1 ? "s" : ""}${cont.repetido ? " · " + cont.repetido + " ignorado(s) por já existir" : ""} · o Assistente de IA já considera os dados novos` };
+  const resumo = () => { st.textContent = `${cont.novo} novo${cont.novo !== 1 ? "s" : ""} · ${cont.atualizado} atualizado${cont.atualizado !== 1 ? "s" : ""}${cont.repetido ? " · " + cont.repetido + " ignorado(s) por já existir" : ""} · a Carol (assistente de vendas) já considera os dados novos` };
   async function importarLinhas(rows, btn, etPadrao){
     if(rows.length > IMP_MAX){ toast(`Até ${IMP_MAX.toLocaleString("pt-BR")} linhas por vez. Use “Importar as linhas de… até…”.`); return }
     btn && (btn.disabled = true);
@@ -7912,19 +7912,19 @@ paint();
 @media print{.ga-fab,.ga-panel{display:none!important}}
 </style>
 
-<button class="ga-fab" id="gaFab" type="button" aria-label="Abrir assistente de IA" aria-expanded="false" aria-controls="gaPanel">
+<button class="ga-fab" id="gaFab" type="button" aria-label="Abrir a Carol, assistente de vendas" aria-expanded="false" aria-controls="gaPanel">
   <svg class="ga-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/><path d="M12 8.2l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z" fill="currentColor"/></svg>
   <svg class="ga-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
   <span class="ga-badge" id="gaBadge" hidden></span>
 </button>
 
-<section class="ga-panel" id="gaPanel" role="dialog" aria-label="Assistente GeoVenda" hidden>
+<section class="ga-panel" id="gaPanel" role="dialog" aria-label="Carol, assistente de vendas" hidden>
   <div class="ga-head">
     <span class="ga-av" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18.5 15l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z"/></svg></span>
-    <div class="ga-tt"><b>Assistente GeoVenda</b><small>Lê seus dados, os arquivos anexados e ensina a usar o app</small></div>
+    <div class="ga-tt"><b>Carol</b><small>Assistente de vendas: lê seus dados, os arquivos anexados e ensina a usar o app</small></div>
     <button class="ga-hb" id="gaGuia" type="button" aria-label="Guia do app: como usar cada tela" title="Como usar o app" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><path d="M12 17h.01"/></svg></button>
     <button class="ga-hb" id="gaNova" type="button" aria-label="Nova conversa" title="Nova conversa"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
-    <button class="ga-hb" id="gaFechar" type="button" aria-label="Fechar assistente" title="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="ga-hb" id="gaFechar" type="button" aria-label="Fechar a Carol" title="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="ga-off" id="gaOff" hidden>A IA não está liberada nesta visualização. Abra o GeoVenda pelo Claude e permita o uso da IA na página.</div>
   <div class="ga-per" role="group" aria-label="Resumo por período">
@@ -7951,7 +7951,7 @@ paint();
   <form class="ga-form" id="gaForm">
     <button class="ga-clip" id="gaClip" type="button" aria-label="Anexar arquivo" title="Anexar arquivo (PDF, Excel, CSV, Word, texto ou imagem)"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/></svg></button>
     <input type="file" id="gaFile" multiple hidden accept=".pdf,.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.docx,.txt,.md,.json,.html,.htm,.png,.jpg,.jpeg,.webp,.gif">
-    <textarea id="gaIn" rows="1" placeholder="Pergunte ou anexe um arquivo…" aria-label="Mensagem para o assistente"></textarea>
+    <textarea id="gaIn" rows="1" placeholder="Pergunte à Carol ou anexe um arquivo…" aria-label="Mensagem para a Carol"></textarea>
     <button class="ga-send" id="gaSend" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </form>
   <div class="ga-drop" id="gaDrop" hidden>Solte para anexar<small>PDF, Excel, CSV, Word, texto ou imagem</small></div>
@@ -8135,7 +8135,7 @@ function baseTexto(orcamento){
 /* ---------- guia do app (base do modo "ensinar a usar") ---------- */
 const GUIA=[
  {g:"Começo",k:"v:inicio",n:"Início",p:"Visão geral do dia: público-alvo da praça, leads ativos, follow-ups de hoje, vendas fechadas e execução da semana, com atalhos para as ferramentas.",s:["Abra o Início no começo do dia.","Clique em um número (ex.: Follow-ups hoje) para ir direto à tela dele.","Use os cartões de “Escolha por onde começar” quando não souber o que fazer."],d:"O alerta vermelho no topo aparece quando há follow-up atrasado; o botão “Ver atrasados” leva direto a eles."},
- {g:"Começo",k:"v:perfil",n:"Perfil do negócio",p:"Cadastro do negócio em 6 etapas (negócio, tom de voz, produto, público, captação, desafios e meta). Tudo o que a IA gera usa o perfil ativo.",s:["Clique em “+ Novo perfil”.","Preencha as 6 etapas; os campos com * são obrigatórios.","Se atende mais de um negócio ou cliente, crie um perfil para cada um e escolha o ativo."],d:"É o PRIMEIRO passo: sem perfil, as respostas da IA ficam genéricas. Informe meta de faturamento e ticket para o funil e o assistente calcularem ritmo."},
+ {g:"Começo",k:"v:perfil",n:"Perfil do negócio",p:"Cadastro do negócio em 6 etapas (negócio, tom de voz, produto, público, captação, desafios e meta). Tudo o que a IA gera usa o perfil ativo.",s:["Clique em “+ Novo perfil”.","Preencha as 6 etapas; os campos com * são obrigatórios.","Se atende mais de um negócio ou cliente, crie um perfil para cada um e escolha o ativo."],d:"É o PRIMEIRO passo: sem perfil, as respostas da IA ficam genéricas. Informe meta de faturamento e ticket para o funil e a Carol calcularem o ritmo."},
  {g:"Mercado",k:"radar",n:"Praças",p:"Mapa do estado com potencial de cada município e bairro (classes A–E, renda, público-alvo, IDHM), ranking das melhores praças, palavras-chave com IA, pedido de pesquisa na web e PDF para o gestor.",s:["No topo, escolha Estado, Tipo de serviço, Classes-alvo, Idade do público e Ticket.","Clique em “↻ Atualizar dados” para recalcular (o botão fica verde quando há mudança pendente).","Clique em um município no mapa (ou busque pelo nome) para ver o detalhe e os bairros.","Troque a cor do mapa em Potencial, Público-alvo, Renda ou IDHM.","Use “PDF p/ gestor” ou “⤓ CSV” para levar os números."],d:"Municípios com ⚠ não têm poder de compra para o ticket informado; evite investir mídia neles."},
  {g:"Mercado",k:"comp",n:"Comparativo",p:"Compara estados, municípios ou bairros por natalidade, gestantes, % de classes A+B e índice maternidade + A/B.",s:["Escolha o nível: Estados, Municípios ou Bairros.","Defina a ordenação e a população mínima.","Marque até 6 locais na tabela para ver “Lado a lado”."],d:"Para bairros, digite antes o município no campo que aparece."},
  {g:"Mercado",k:"hor",n:"Horários e mídias",p:"Mostra em que dias e horários o público pesquisa e usa cada mídia, em mapa de calor, e aceita seus próprios dados de campanha.",s:["Clique em “+ Monitorar público atual” para criar o monitor do filtro que está nas Praças.","Escolha a mídia no mapa de calor.","Em “Seus dados de campanha”, importe o relatório da sua campanha para usar os seus números reais."],d:"Use as “Melhores janelas por mídia” para programar anúncios e posts."},
@@ -8172,7 +8172,7 @@ const GUIA=[
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
  {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, escolha a escola de onde a pessoa é (para quem tem mais de uma unidade), informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
- {g:"Assistente",k:"",n:"Assistente (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
+ {g:"Assistente",k:"",n:"Carol, assistente de vendas (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
 const GUIA_INICIO=[["v:perfil","Cadastre o Perfil do negócio (meta, ticket, público e desafios)."],["radar","Em Praças, escolha estado e serviço e encontre as melhores cidades e bairros."],["v:qualificacao","Registre cada lead novo em Qualificação de leads e responda dentro do limite."],["v:rotina","Em Minha rotina, transforme a meta em números do dia."],["v:acompanhamento","Siga os follow-ups no Acompanhamento e marque o resultado (perdido sempre com motivo)."],["f:lancar","Todo mês, lance os números da escola em Medir › Lançar dados."]];
 function guiaTexto(){
@@ -8226,7 +8226,7 @@ function dadosFunil(){
 function contexto(){
   const now=new Date(), dia=now.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}), hora=now.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
   let v="Dados do Vendedor ainda não carregados."; try{ if(window.VENDEDOR&&VENDEDOR.contexto) v=VENDEDOR.contexto(); }catch(e){ v="Não consegui ler os dados internos do Vendedor."; }
-  return `Você é o ASSISTENTE GEOVENDA, agente de IA de produtividade comercial dentro do app GeoVenda (CNC Training & Consulting). Responda sempre em português do Brasil.
+  return `Você é a CAROL, assistente de vendas e agente de IA de produtividade comercial dentro do app GeoVenda (CNC Training & Consulting). Responda sempre em português do Brasil. Se perguntarem seu nome, diga que é a Carol, assistente de vendas do GeoVenda. O nome Carol é só seu, dentro desta conversa: nunca assine nem cite "Carol" em mensagens, scripts, posts ou qualquer texto gerado para clientes ou leads; nesses textos use as variáveis {{consultor}}, {{nome_dono}} e {{nome_empresa}}.
 Pense como um especialista em Growth Marketing aplicado a vendas: lente de funil (aquisição → ativação → conversão → retenção → indicação), dados primeiro, priorização por impacto na receita, ações rápidas e mensuráveis.
 
 COMO RESPONDER
@@ -8280,7 +8280,7 @@ function copyBtn(d,txt){ const b=document.createElement("button"); b.type="butto
   b.onclick=async()=>{ try{ await navigator.clipboard.writeText(semTok(txt)); b.textContent="Copiado"; }catch(e){ b.textContent="Não deu para copiar"; } setTimeout(()=>b.textContent="Copiar resposta",1800); }; d.append(b); }
 function welcome(){
   const w=document.createElement("div"); w.className="ga-welcome";
-  w.innerHTML="<b>Oi! Eu leio os dados que você já colocou no GeoVenda</b> (leads e follow-ups, checklist, agenda de conteúdo, perfil, meta, praças e funil) <b>e os arquivos que você anexar</b> no clipe. <b>Também te ensino a usar o app:</b> toque em <b>Aprender</b>, no <b>?</b> lá em cima, ou pergunte “como faço…”. Para os resumos, use <b>Hoje</b>, <b>Semana</b> ou <b>Mês</b>:";
+  w.innerHTML="<b>Oi! Eu sou a Carol, sua assistente de vendas. Eu leio os dados que você já colocou no GeoVenda</b> (leads e follow-ups, checklist, agenda de conteúdo, perfil, meta, praças e funil) <b>e os arquivos que você anexar</b> no clipe. <b>Também te ensino a usar o app:</b> toque em <b>Aprender</b>, no <b>?</b> lá em cima, ou pergunte “como faço…”. Para os resumos, use <b>Hoje</b>, <b>Semana</b> ou <b>Mês</b>:";
   const s=document.createElement("div"); s.className="ga-sug";
   const sug=BASE.length?["Resume o arquivo anexado e o que ele pede de mim","Quais tarefas e prazos aparecem nos arquivos?"].concat(SUG.slice(0,3)):SUG;
   sug.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.textContent=t; b.onclick=()=>perguntar(t); s.append(b); });
@@ -8349,7 +8349,7 @@ async function perguntar(texto,label){
 }
 
 function abrir(on){
-  panel.hidden=!on; fab.setAttribute("aria-expanded",on); fab.setAttribute("aria-label",on?"Fechar assistente de IA":"Abrir assistente de IA");
+  panel.hidden=!on; fab.setAttribute("aria-expanded",on); fab.setAttribute("aria-label",on?"Fechar a Carol":"Abrir a Carol, assistente de vendas");
   if(on){ render(); renderFiles(); setTimeout(()=>inp.focus(),30); }
 }
 fab.onclick=()=>abrir(panel.hidden);
