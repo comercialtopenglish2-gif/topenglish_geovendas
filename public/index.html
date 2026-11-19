@@ -4441,7 +4441,7 @@ function qlScore(){
   const box = $("#qlScore"); box.innerHTML = ""; box.append(tempTag(t));
   const s = document.createElement("span"); s.textContent = `${sc} ponto${sc !== 1 ? "s" : ""} · quente a partir de ${QCFG.quente}, morno a partir de ${QCFG.morno}`; s.style.color = "var(--muted)"; box.append(s);
   const sel = $("#ql-resp"), atual = sel.value, sug = sugerirResp(t);
-  const nomes = [...new Set([...(QCFG.vendedores || []), perfil()?.dono].filter(Boolean))];
+  const nomes = [...new Set([...(QCFG.vendedores || []), ...(window.GV_EQUIPE_VENDAS || []), perfil()?.dono].filter(Boolean))];
   sel.innerHTML = `<option value="">Sem responsável</option>` + nomes.map(n => `<option>${esc(n)}</option>`).join("");
   sel.value = sel.dataset.manual && nomes.includes(atual) ? atual : sug || "";
 }
@@ -4513,7 +4513,7 @@ function renderQLTabela(){
   if(qlFiltro === "sem") at = at.filter(l => !l.interesse); else if(qlFiltro !== "todos") at = at.filter(l => l.interesse === qlFiltro);
   $$("#qlFiltro .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.t === qlFiltro));
   if(!at.length){ tb.innerHTML = `<tr><td><div class="empty-mini">Nenhum lead ativo neste filtro.</div></td></tr>`; return }
-  const nomes = [...new Set([...(QCFG.vendedores || []), perfil()?.dono, ...at.map(l => l.resp)].filter(Boolean))];
+  const nomes = [...new Set([...(QCFG.vendedores || []), ...(window.GV_EQUIPE_VENDAS || []), perfil()?.dono, ...at.map(l => l.resp)].filter(Boolean))];
   tb.innerHTML = `<tr><th>Lead</th><th>Temperatura</th><th class="n">Pontos</th><th>Responsável</th><th>Canal</th><th>1ª resposta</th><th>Próximo passo</th><th></th></tr>`;
   at.forEach(l => {
     const tr = document.createElement("tr");
@@ -4544,7 +4544,7 @@ function renderQLTabela(){
 $$("#qlFiltro .chip").forEach(c => c.onclick = () => { qlFiltro = c.dataset.t; renderQLTabela() });
 function renderQLDist(){
   const tb = $("#qlDist"), leads = Object.values(FU);
-  const nomes = [...new Set([...(QCFG.vendedores || []), ...leads.filter(l => l.resp).map(l => l.resp)])];
+  const nomes = [...new Set([...(QCFG.vendedores || []), ...(window.GV_EQUIPE_VENDAS || []), ...leads.filter(l => l.resp).map(l => l.resp)])];
   const linhas = nomes.map(n => [n, leads.filter(l => l.resp === n)]).concat([["Sem responsável", leads.filter(l => !l.resp && (l.origem === "entrada" || l.interesse))]]);
   if(!leads.length){ tb.innerHTML = `<tr><td><div class="empty-mini">Os leads registrados aparecem aqui por vendedor.</div></td></tr>`; return }
   tb.innerHTML = `<tr><th>Vendedor</th><th class="n">Ativos</th><th class="n">Quentes</th><th class="n">Aguardando 1ª resposta</th><th class="n">Tempo médio 1ª resposta (mês)</th><th class="n">No prazo (mês)</th><th class="n">Fechados</th><th class="n">Conversão</th></tr>`;
@@ -4970,7 +4970,7 @@ const clientes = () => Object.values(FU).filter(l => l.status === "fechou").sort
 const planoDe = l => (l.cli && l.cli.plano) || (l.oferta && l.oferta.alvo && l.oferta.alvo.nome) || perfil()?.produto || "";
 const objetivoDe = l => l.analise || "";
 function hist(l, evento, resposta){ l.historico = [...(l.historico || []), {data: new Date().toISOString(), evento, resposta: resposta || ""}] }
-function nomesResp(){ return [...new Set([...(QCFG.vendedores || []), perfil()?.dono].filter(Boolean))] }
+function nomesResp(){ return [...new Set([...(QCFG.vendedores || []), ...(window.GV_EQUIPE_VENDAS || []), perfil()?.dono].filter(Boolean))] }
 function selCliente(sel, vazio){
   const atual = sel.value, cs = clientes();
   sel.innerHTML = (vazio ? `<option value="">${vazio}</option>` : "") + cs.map(l => `<option value="${esc(l.id)}">${esc(l.nome)}${planoDe(l) ? " · " + esc(planoDe(l)) : ""}</option>`).join("");
@@ -5499,7 +5499,7 @@ const respDe = l => l.resp || perfil()?.dono || "Sem responsável";
 const fmtNum = (v, d = 1) => v == null || isNaN(v) ? "—" : (Math.round(v * 10 ** d) / 10 ** d).toLocaleString("pt-BR");
 const brlE3 = v => v == null || isNaN(v) ? "—" : v.toLocaleString("pt-BR", {style: "currency", currency: "BRL", maximumFractionDigits: 0});
 let TREINADORES = store.get("treinadores", []) || [];
-function vendedoresTodos(){ const s = new Set(nomesResp()); (TREINADORES || []).forEach(n => s.add(n)); Object.values(FU).forEach(l => { if(l.resp) s.add(l.resp) }); TREINOS.forEach(t => { if(t.vend) s.add(t.vend) }); return [...s].filter(Boolean) }
+function vendedoresTodos(){ const s = new Set(nomesResp()); (window.GV_EQUIPE_VENDAS || []).forEach(n => s.add(n)); (TREINADORES || []).forEach(n => s.add(n)); Object.values(FU).forEach(l => { if(l.resp) s.add(l.resp) }); TREINOS.forEach(t => { if(t.vend) s.add(t.vend) }); return [...s].filter(Boolean) }
 function periodoSem(d){ const a = segunda(new Date()), b = new Date(a); b.setDate(b.getDate() + 7); return d >= a && d < b }
 const noPer = (iso, per) => { if(!iso) return false; const d = new Date(iso); return per === "semana" ? periodoSem(d) : periodoOk(d, per) };
 
@@ -5731,6 +5731,7 @@ function rankingEquipeDoc(){ const me = perfil()?.dono, f = per => { const all =
 /* ---------- c) coaching ---------- */
 const ETAPAS_M = [["conexao","Conexão"],["diagnostico","Diagnóstico"],["valor","Valor"],["objecoes","Objeções"],["fechamento","Fechamento"]];
 let coVend = "";
+window.addEventListener("gv-equipe", () => { ["#s-vend", "#pr-vend", "#co-vend"].forEach(q => { try{ const e = $(q); if(e) vendSel(e) }catch{} }) });
 function vendSel(sel){ const vs = vendedoresTodos(), at = sel.value; sel.innerHTML = (perfil()?.dono ? "" : `<option value="">Eu</option>`) + vs.map(v => `<option>${esc(v)}</option>`).join("") + (sel.id === "co-vend" ? "" : `<option value="__novo">+ Outra pessoa (digitar nome)</option>`); if(vs.includes(at)) sel.value = at }
 function novoTreinador(sel){
   let row = sel.nextElementSibling; if(!row || !row.classList.contains("vend-novo")){ sel.insertAdjacentHTML("afterend", `<div class="vend-novo"><input type="text" maxlength="60" placeholder="Nome de quem vai treinar"><button class="btn" type="button">Adicionar</button><button class="btn ghost" type="button">Cancelar</button></div>`); row = sel.nextElementSibling }
@@ -6627,7 +6628,7 @@ async function writeIndex(units){
 const byNome=(a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),"pt-BR");
 function pickUnit(){ if(S.unit&&S.units.some(u=>u.id===S.unit))return; const r=S.units.find(u=>u.id===remU); S.unit=r?r.id:(S.units[0]?S.units[0].id:null); }
 function localRefresh(){
- S.units=Object.entries(L.unidades).map(([id,d])=>({id,...d})).sort(byNome); pickUnit();
+ S.units=Object.entries(L.unidades).map(([id,d])=>({id,...d})).sort(byNome); pickUnit(); pubEquipe();
  const f=c=>Object.entries(L[c]).map(([id,d])=>({id,...clone(d)})).filter(d=>d.unidade===S.unit);
  S.pesquisas=f("pesquisas");S.conteudos=f("conteudos");S.acoes=f("acoes");S.influ=f("influenciadores");
  if(!funilDirty)S.funil=clone(L.funil[funilId()]||null);
@@ -6637,7 +6638,7 @@ let unsubs=[],unsubFunil=null,unsubUnits=null;
 function subSpace(){
  if(unsubUnits){unsubUnits();unsubUnits=null}
  S.units=[];let first=true;
- unsubUnits=S.db.collection(P("unidades")).onSnapshot(s=>{S.units=s.docs.map(d=>({id:d.id,...clone(d.data())})).sort(byNome);const prev=S.unit;pickUnit();S.ready=true;if(first||S.unit!==prev){first=false;subUnit()}render()},()=>{S.ready=true;render()});
+ unsubUnits=S.db.collection(P("unidades")).onSnapshot(s=>{S.units=s.docs.map(d=>({id:d.id,...clone(d.data())})).sort(byNome);pubEquipe();const prev=S.unit;pickUnit();S.ready=true;if(first||S.unit!==prev){first=false;subUnit()}render()},()=>{S.ready=true;render()});
 }
 function subUnit(){
  unsubs.forEach(f=>f());unsubs=[];
@@ -7465,10 +7466,45 @@ function fichaHTML(u){
 function vUnidades(){
  const u=curUnit();let html="";
  if(u){const miss=missCad(u);html+='<section class="panel"><div class="ph"><div><h2>Cadastro da escola</h2><p class="sub">Estes dados saem no cabeçalho e no rodapé de todo PDF gerado pelo app.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="unit-edit" data-id="'+u.id+'">Editar cadastro</button>'+(S.downloads?'<button class="btn pri" data-act="pdf">Gerar PDF do mês</button>':"")+"</div></div>"+
-  (miss.length?'<div class="alert warn" style="margin-bottom:14px"><div><b>Cadastro incompleto</b><span>Falta preencher: '+h(miss.join(", "))+". O PDF sai com esses campos em branco.</span></div></div>":"")+fichaHTML(u)+"</section>"}
+  (miss.length?'<div class="alert warn" style="margin-bottom:14px"><div><b>Cadastro incompleto</b><span>Falta preencher: '+h(miss.join(", "))+". O PDF sai com esses campos em branco.</span></div></div>":"")+fichaHTML(u)+"</section>"+equipeHTML(u)}
  html+='<section class="panel"><div class="ph"><div><h2>Escolas cadastradas</h2><p class="sub">Cada escola tem seu funil, pesquisas, conteúdo e ações separados.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="demo">Carregar escola de exemplo</button><button class="btn pri" data-act="unit-new">Cadastrar escola</button></div></div>'+
  (S.units.length?'<div class="tw"><table><thead><tr><th>Escola</th><th>Master</th><th>Cidade</th><th>Contato</th><th>Cadastro</th><th></th></tr></thead><tbody>'+S.units.map(x=>{const m=missCad(x);return '<tr'+(x.id===S.unit?' class="sel"':"")+"><td><b>"+h(x.nome)+"</b></td><td>"+h(x.master||"—")+"</td><td>"+h([x.cidade,x.uf].filter(Boolean).join("/")||"—")+"</td><td>"+h(x.telefone||"—")+(x.email?'<br><span class="note">'+h(x.email)+"</span>":"")+'</td><td><span class="chip '+(m.length?"warn":"good")+'">'+(m.length?"Faltam "+m.length:"Completo")+'</span></td><td><div class="row-actions">'+(x.id!==S.unit?'<button class="btn sm" data-act="unit-pick" data-id="'+x.id+'">Abrir</button>':"")+'<button class="btn ghost sm" data-act="unit-edit" data-id="'+x.id+'">Editar</button></div></td></tr>'}).join("")+"</tbody></table></div>":emptyUnits())+"</section>";
  return html;
+}
+const FUNCOES=["Vendedor(a)","Consultor(a) comercial","Atendimento / recepção","Coordenação","Gestor(a)","Outro"];
+const FUNCOES_VENDA=["Vendedor(a)","Consultor(a) comercial"];
+const COLAB_FIELDS=[
+ {k:"nome",l:"Nome completo",req:1,full:1},
+ {k:"funcao",l:"Função",t:"select",o:FUNCOES},{k:"ativo",l:"Situação",t:"select",o:[["sim","Ativo"],["nao","Inativo"]]},
+ {k:"whatsapp",l:"WhatsApp",t:"tel",mask:"tel"},{k:"email",l:"E-mail",t:"email"},
+ {k:"entrada",l:"Na equipe desde",t:"date"}
+];
+const equipeDe=u=>Array.isArray(u&&u.equipe)?u.equipe:[];
+function equipeHTML(u){
+ const eq=equipeDe(u).slice().sort((a,b)=>(a.ativo==="nao")-(b.ativo==="nao")||byNome(a,b));
+ const dt=v=>v?v.split("-").reverse().join("/"):"—";
+ return '<section class="panel"><div class="ph"><div><h2>Equipe da escola</h2><p class="sub">Vendedores e demais colaboradores de '+h(u.nome)+'. Quem é de vendas aparece no Vendedor: Simulador, Analisar print, Ranking e Consultor em Treinamentos.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="colab-new">Novo colaborador</button></div></div>'+
+ (eq.length?'<div class="tw"><table><thead><tr><th>Nome</th><th>Função</th><th>Contato</th><th>Desde</th><th>Situação</th><th></th></tr></thead><tbody>'+eq.map(c=>'<tr><td><b>'+h(c.nome)+"</b></td><td>"+h(c.funcao||"—")+"</td><td>"+h(c.whatsapp||"—")+(c.email?'<br><span class="note">'+h(c.email)+"</span>":"")+"</td><td>"+h(dt(c.entrada))+'</td><td><span class="chip '+(c.ativo==="nao"?"warn":"good")+'">'+(c.ativo==="nao"?"Inativo":"Ativo")+'</span></td><td><div class="row-actions"><button class="btn ghost sm" data-act="colab-edit" data-id="'+h(c.id)+'">Editar</button></div></td></tr>').join("")+"</tbody></table></div>"
+ :'<div class="empty-mini" style="padding:14px 0;color:var(--muted)">Nenhum colaborador cadastrado. Clique em <b>Novo colaborador</b> para incluir o primeiro vendedor.</div>')+"</section>";
+}
+function colabForm(c){
+ const u=curUnit();if(!u){toast("Cadastre ou abra uma escola primeiro.");return}
+ openForm(c?"Editar colaborador":"Novo colaborador",COLAB_FIELDS,c?clone(c):{funcao:"Vendedor(a)",ativo:"sim",entrada:TODAY},async d=>{
+  d.nome=String(d.nome||"").trim().replace(/\s+/g," ");
+  if(!d.nome){toast("Informe o nome.");return false}
+  if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)){toast("Confira o e-mail: ele precisa ter o formato nome@dominio.com.");return false}
+  const lista=equipeDe(u);
+  if(lista.some(x=>x.id!==(c&&c.id)&&String(x.nome).toLowerCase()===d.nome.toLowerCase())){toast(d.nome+" já está na equipe desta escola.");return false}
+  const novo=Object.assign({},c||{},d,{id:c?c.id:rid()});
+  const eq=c?lista.map(x=>x.id===c.id?novo:x):lista.concat([novo]);
+  await Store.patch("unidades",u.id,{equipe:eq});u.equipe=eq;pubEquipe();
+  toast(c?"Colaborador atualizado":d.nome+" entrou na equipe"+(FUNCOES_VENDA.includes(d.funcao)?". Já aparece no Vendedor.":"."));return true
+ },c?async()=>{const eq=equipeDe(u).filter(x=>x.id!==c.id);await Store.patch("unidades",u.id,{equipe:eq});u.equipe=eq;pubEquipe()}:null);
+}
+// Vendedores ativos das escolas viram opções no Vendedor (mesma página, outro módulo)
+function pubEquipe(){
+ const nomes=[...new Set(S.units.flatMap(x=>equipeDe(x)).filter(c=>c.ativo!=="nao"&&FUNCOES_VENDA.includes(c.funcao)).map(c=>c.nome).filter(Boolean))];
+ window.GV_EQUIPE_VENDAS=nomes;try{window.dispatchEvent(new CustomEvent("gv-equipe",{detail:nomes}))}catch(e){}
 }
 const UF=["","AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 const UNIT_FIELDS=[
@@ -7570,6 +7606,8 @@ root.addEventListener("click",async e=>{
   case "inf-new":infForm(null);break;
   case "inf-edit":infForm(find(S.influ));break;
   case "unit-new":unitForm(null);break;
+  case "colab-new":colabForm(null);break;
+  case "colab-edit":colabForm(equipeDe(curUnit()).find(c=>c.id===id));break;
   case "unit-edit":unitForm(S.units.find(u=>u.id===id));break;
   case "unit-pick":S.unit=id;store.set("geofunil-unit",id);subUnit();break;
   case "demo":b.disabled=true;try{await loadDemo()}catch(_){}b.disabled=false;break;
@@ -8128,7 +8166,7 @@ const GUIA=[
  {g:"Medir",k:"camp",n:"Campanhas e brindes",p:"Campanhas de vendas com brinde (ex.: Black Friday com caixa por matrícula): período, regra, alunos com direito, entregas, estoque de caixas por unidade e comparação entre campanhas. O franqueador cria campanhas e controla o estoque; o master lança os alunos e as entregas da unidade dele.",s:["Escolha a campanha no topo.","Lance o aluno em “+ Lançar aluno” ou importe a planilha do sistema.","Marque as entregas em “Alunos e entregas”.","Veja em “Comparar campanhas” o que deu mais resultado."],d:"Use a regra da campanha para explicar ao lead o prazo: brinde só para matrículas dentro do período."},
  {g:"Medir",k:"f:acoes",n:"Ações e influência",p:"Gerenciador de ações da unidade (lista e calendário, responsável, prazo, checklist, status e atrasadas, resultado em leads, aulas experimentais e matrículas, CPL e CAC por ação) e Melhorador de ações com IA, seguindo as regras da Top English. Também registra influenciadores.",s:["Clique em “Nova ação” ou em “Sugerir ações com IA” para montar o mês.","Na ação planejada, use “Melhorar com IA”: a IA revisa público, local, canal, chamada e oferta no Método Âncora e gera o checklist.","Marque as tarefas em “Detalhes”; ao concluir, registre leads, aulas e matrículas em Editar.","Na ação concluída, use “Avaliar com IA” para saber se repete, ajusta ou para, e planeje a próxima versão."],d:"A IA compara o CPL e o CAC de cada ação com as fontes do mês e nunca inventa números: o que faltar aparece como [__]."},
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
- {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs.",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas e conteúdo separados."},
+ {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
  {g:"Assistente",k:"",n:"Assistente (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
