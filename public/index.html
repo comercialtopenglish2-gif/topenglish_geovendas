@@ -7489,16 +7489,20 @@ function equipeHTML(u){
 }
 function colabForm(c){
  const u=curUnit();if(!u){toast("Cadastre ou abra uma escola primeiro.");return}
- openForm(c?"Editar colaborador":"Novo colaborador",COLAB_FIELDS,c?clone(c):{funcao:"Vendedor(a)",ativo:"sim",entrada:TODAY},async d=>{
+ const campos=[{k:"escola",l:"Escola",t:"select",o:S.units.map(x=>[x.id,x.nome||"(sem nome)"]),full:1}].concat(COLAB_FIELDS);
+ openForm(c?"Editar colaborador":"Novo colaborador",campos,Object.assign(c?clone(c):{funcao:"Vendedor(a)",ativo:"sim",entrada:TODAY},{escola:u.id}),async d=>{
   d.nome=String(d.nome||"").trim().replace(/\s+/g," ");
   if(!d.nome){toast("Informe o nome.");return false}
   if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)){toast("Confira o e-mail: ele precisa ter o formato nome@dominio.com.");return false}
-  const lista=equipeDe(u);
-  if(lista.some(x=>x.id!==(c&&c.id)&&String(x.nome).toLowerCase()===d.nome.toLowerCase())){toast(d.nome+" já está na equipe desta escola.");return false}
+  const alvo=S.units.find(x=>x.id===d.escola)||u;delete d.escola;
+  const listaAlvo=equipeDe(alvo);
+  if(listaAlvo.some(x=>x.id!==(c&&c.id)&&String(x.nome).toLowerCase()===d.nome.toLowerCase())){toast(d.nome+" já está na equipe de "+(alvo.nome||"desta escola")+".");return false}
   const novo=Object.assign({},c||{},d,{id:c?c.id:rid()});
-  const eq=c?lista.map(x=>x.id===c.id?novo:x):lista.concat([novo]);
-  await Store.patch("unidades",u.id,{equipe:eq});u.equipe=eq;pubEquipe();
-  toast(c?"Colaborador atualizado":d.nome+" entrou na equipe"+(FUNCOES_VENDA.includes(d.funcao)?". Já aparece no Vendedor.":"."));return true
+  if(c&&alvo.id!==u.id){const eqU=equipeDe(u).filter(x=>x.id!==c.id);await Store.patch("unidades",u.id,{equipe:eqU});u.equipe=eqU}
+  const eq=(c&&alvo.id===u.id)?listaAlvo.map(x=>x.id===c.id?novo:x):listaAlvo.concat([novo]);
+  await Store.patch("unidades",alvo.id,{equipe:eq});alvo.equipe=eq;pubEquipe();
+  const onde=alvo.id!==u.id?" na equipe de "+(alvo.nome||"outra escola"):"";
+  toast(c?"Colaborador atualizado"+(onde?": agora está"+onde:""):d.nome+" entrou"+(onde||" na equipe")+(FUNCOES_VENDA.includes(d.funcao)?". Já aparece no Vendedor.":"."));render();return true
  },c?async()=>{const eq=equipeDe(u).filter(x=>x.id!==c.id);await Store.patch("unidades",u.id,{equipe:eq});u.equipe=eq;pubEquipe()}:null);
 }
 // Vendedores ativos das escolas viram opções no Vendedor (mesma página, outro módulo)
@@ -8166,7 +8170,7 @@ const GUIA=[
  {g:"Medir",k:"camp",n:"Campanhas e brindes",p:"Campanhas de vendas com brinde (ex.: Black Friday com caixa por matrícula): período, regra, alunos com direito, entregas, estoque de caixas por unidade e comparação entre campanhas. O franqueador cria campanhas e controla o estoque; o master lança os alunos e as entregas da unidade dele.",s:["Escolha a campanha no topo.","Lance o aluno em “+ Lançar aluno” ou importe a planilha do sistema.","Marque as entregas em “Alunos e entregas”.","Veja em “Comparar campanhas” o que deu mais resultado."],d:"Use a regra da campanha para explicar ao lead o prazo: brinde só para matrículas dentro do período."},
  {g:"Medir",k:"f:acoes",n:"Ações e influência",p:"Gerenciador de ações da unidade (lista e calendário, responsável, prazo, checklist, status e atrasadas, resultado em leads, aulas experimentais e matrículas, CPL e CAC por ação) e Melhorador de ações com IA, seguindo as regras da Top English. Também registra influenciadores.",s:["Clique em “Nova ação” ou em “Sugerir ações com IA” para montar o mês.","Na ação planejada, use “Melhorar com IA”: a IA revisa público, local, canal, chamada e oferta no Método Âncora e gera o checklist.","Marque as tarefas em “Detalhes”; ao concluir, registre leads, aulas e matrículas em Editar.","Na ação concluída, use “Avaliar com IA” para saber se repete, ajusta ou para, e planeje a próxima versão."],d:"A IA compara o CPL e o CAC de cada ação com as fontes do mês e nunca inventa números: o que faltar aparece como [__]."},
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
- {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
+ {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, escolha a escola de onde a pessoa é (para quem tem mais de uma unidade), informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
  {g:"Assistente",k:"",n:"Assistente (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
