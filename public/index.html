@@ -5689,7 +5689,7 @@ function renderRanking(){
   $$("#rkPer .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.p === rkPer));
   const rk = metricas(rkPer), mes = Object.fromEntries(metricas("mes").map(x => [x.nome, x]));
   const pod = $("#rkPodio"); pod.innerHTML = "";
-  if(!rk.length || !rk[0].pts) pod.innerHTML = `<div class="empty-mini" style="grid-column:1/-1">Ainda sem pontos ${rkPer === "semana" ? "nesta semana" : "neste mês"}. Os pontos aparecem quando a equipe registra vendas, respostas, follow-ups e treinos. Cadastre os vendedores em Qualificação de leads › Configurar.</div>`;
+  if(!rk.length || !rk[0].pts) pod.innerHTML = `<div class="empty-mini" style="grid-column:1/-1">Ainda sem pontos ${rkPer === "semana" ? "nesta semana" : "neste mês"}. Os pontos aparecem quando a equipe registra vendas, respostas, follow-ups e treinos. Cadastre os vendedores em Escolas › Equipe da escola (Novo colaborador) ou em Qualificação de leads › Configurar.</div>`;
   else [1, 0, 2].forEach(i => { const x = rk[i]; if(!x) return; const d = document.createElement("div"); d.className = "rk-pod p" + (i + 1); d.innerHTML = `<span class="pos">${i + 1}º lugar</span><b></b><span class="pts">${x.pts}</span><small>pontos</small><span class="nivel ${nivel((mes[x.nome] || {}).pts || 0)}">${nivel((mes[x.nome] || {}).pts || 0)}</span>`; d.querySelector("b").textContent = x.nome; pod.append(d) });
   const tb = $("#rkTabela");
   tb.innerHTML = `<tr><th>#</th><th>Vendedor</th><th class="n">Pontos</th>${MET.map(([, n]) => `<th class="n">${n}</th>`).join("")}<th>Nível (mês)</th><th>Conquistas</th></tr>`;
