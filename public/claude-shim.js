@@ -244,7 +244,7 @@
     var linha2 = S.rotulo + (u.nome ? " · " + u.nome : "") + (u.uf ? " · " + u.uf : "");
     d.innerHTML = '<b style="display:block;font-size:13.5px"></b><span></span><button type="button" style="display:block;margin-top:8px;border:1px solid currentColor;background:none;color:inherit;border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer">Sair</button>';
     d.querySelector("b").textContent = nome; d.querySelector("span").textContent = linha2;
-    if (S.master) { var l = document.createElement("a"); l.href = "/acessos"; l.textContent = "Unidades e acessos"; l.setAttribute("style", "display:block;margin-top:6px;color:inherit;text-decoration:underline"); d.insertBefore(l, d.querySelector("button")); }
+    if (S.master) { var l = document.createElement("a"); l.href = "/acessos"; l.textContent = "Unidades e acessos"; l.setAttribute("style", "display:block;margin-top:6px;color:inherit;text-decoration:underline"); l.onclick = function (e) { var nb = document.querySelector('#gvNav button[data-k="acessos"]'); if (nb && !nb.hidden) { e.preventDefault(); nb.click(); } }; d.insertBefore(l, d.querySelector("button")); }
     d.querySelector("button").onclick = function () {
       fetch("/auth/logout", { method: "POST", credentials: "same-origin" }).finally(function () {
         try { localStorage.removeItem("gv_conta"); } catch (e) {}

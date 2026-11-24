@@ -410,6 +410,7 @@ header.top{border-bottom:3px solid #FFB400}
     <p class="gv-grp">Conta</p>
     <button type="button" data-k="v:perfil"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 10h3M15 14h3"/></svg>Perfil do negócio</button>
     <button type="button" data-k="v:historico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Histórico</button>
+    <button type="button" data-k="acessos" id="gvAcessos" hidden><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6 6 0 0 1 3 6"/></svg>Unidades e acessos</button>
     <button type="button" data-k="uso"><svg viewBox="0 0 24 24"><path d="M4 20V14M9 20V9M14 20v-8M19 20V4"/><path d="M2 20h20"/></svg>Uso de IA</button>
     <button type="button" data-k="v:metodo" id="gvMetodo" hidden><svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg>Método CNC</button>
   </nav>
@@ -623,6 +624,7 @@ header.top{border-bottom:3px solid #FFB400}
   <div id="view-vend" hidden style="margin-top:16px"><div id="vendHost"></div></div>
   <div id="view-funil" hidden style="margin-top:16px"><div id="funilHost"></div></div>
   <div id="view-uso" hidden style="margin-top:16px"></div>
+  <div id="view-acessos" hidden style="margin-top:16px"><iframe id="acessosFrame" title="Unidades e acessos" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
   <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
 </div>
 <footer class="site-foot"><div><b>GeoVenda</b> · Processos Comerciais e Inteligência de praça para vender mais!</div><div>by <b>CNC Training &amp; Consulting</b></div></footer>
@@ -1702,7 +1704,8 @@ function initDicas(){
 /* ---------------- views ---------------- */
 function switchView(v){
   S.view=v; document.querySelectorAll("#vtabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));
-  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; $("#view-uso").hidden=v!=="uso"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp"||v==="uso";
+  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; $("#view-uso").hidden=v!=="uso"; $("#view-acessos").hidden=v!=="acessos"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp"||v==="uso"||v==="acessos";
+  if(v==="acessos"){ const fr=$("#acessosFrame"); if(!fr.src) fr.src="/acessos"; else { try{ fr.contentWindow.location.reload(); }catch(e){} } }
   if(v==="uso"&&window.GV_USO_TELA) window.GV_USO_TELA();
   if(v==="camp"){ const fr=$("#campFrame"); if(!fr.src) fr.src="/campanhas"; /* altura fixa na tela: as janelas (lançar, importar) abrem sempre visíveis */ }
   if(v==="vend"&&window.RADAR) window.RADAR._n();
@@ -7762,9 +7765,9 @@ render();
 <script>
 (function(){
 const $q=s=>document.querySelector(s);
-const LABEL={"uso": ["Conta", "Uso de IA"], "camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
+const LABEL={"acessos": ["Conta", "Unidades e acessos"], "uso": ["Conta", "Uso de IA"], "camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
 let funilView=(window.GEOFUNIL&&GEOFUNIL.atual())||"painel";
-let radarView=!$q("#view-uso").hidden?"uso":!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
+let radarView=!$q("#view-acessos").hidden?"acessos":!$q("#view-uso").hidden?"uso":!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
 function paint(){
   const k=radarView==="vend"?"v:"+vendView:radarView==="funil"?"f:"+funilView:radarView, nk=k==="v:cadastro"?"v:perfil":k;
   document.querySelectorAll("#gvNav button").forEach(b=>{ if(b.dataset.k===nk) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
@@ -7783,6 +7786,13 @@ window.GV={
   gestor(on,n){ $q("#gvGestor").hidden=!on; const b=$q("#gvGestorBadge"); b.textContent=n||""; b.hidden=!n; b.classList.add("late"); },
   metodo(on){ $q("#gvMetodo").hidden=!on; }
 };
+if(window.GV_SESSION&&window.GV_SESSION.master) $q("#gvAcessos").hidden=false;
+(function(){ const fr=$q("#acessosFrame"); if(!fr) return;
+  fr.addEventListener("load",()=>{ try{ const d=fr.contentDocument; if(!d||!d.body) return;
+    const limpa=()=>d.querySelectorAll('a[href="/"]').forEach(a=>a.remove());
+    limpa(); new MutationObserver(limpa).observe(d.body,{childList:true,subtree:true});
+  }catch(e){} });
+})();
 document.querySelectorAll("#gvNav button").forEach(b=>b.onclick=()=>{
   const k=b.dataset.k;
   if(k.startsWith("v:")){ if(window.RADAR) RADAR.ir("vend"); if(window.VENDEDOR) VENDEDOR.show(k.slice(2)); }
@@ -8274,6 +8284,7 @@ const GUIA=[
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
  {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, escolha a escola de onde a pessoa é (para quem tem mais de uma unidade), informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
+ {g:"Conta",k:"acessos",n:"Unidades e acessos",p:"Só para o franqueador: mostra quem já entrou no GeoVenda (papel e unidade vêm do sistema da Top English) e permite corrigir o estado (UF) e a cidade de cada unidade.",s:["No menu, em Conta, clique em Unidades e acessos.","Em Quem já entrou, confira o papel e a unidade de cada pessoa.","Em Unidades, corrija a UF ou a cidade que vier errada e clique em Salvar."],d:"O master só vê os dados da UF e do funil da unidade dele; por isso a UF da unidade precisa estar certa."},
  {g:"Conta",k:"uso",n:"Uso de IA",p:"Mostra quanto do limite mensal de IA (US$ 10 por pessoa) você já usou, quanto falta, o consumo por dia e em quais funções a IA mais gastou.",s:["No menu, em Conta, clique em Uso de IA (ou na barra IA DO MÊS, no quadro com seu nome).","Veja a barra: quanto já usou e quantos por cento ainda restam.","No gráfico Consumo por dia, passe o mouse nas barras para ver o valor de cada dia.","Em Gasto por função e na tabela, veja onde a IA mais gastou e o custo médio de cada uso."],d:"O limite não acumula: volta para US$ 10 todo dia 5. Se chegar a US$ 10 antes disso, a IA fica bloqueada até o dia 5."},
  {g:"Assistente",k:"",n:"Carol, assistente de vendas (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
@@ -8408,6 +8419,7 @@ function renderGuia(){
   let grp="";
   GUIA.forEach((t,i)=>{
     if(t.k==="v:gestor"&&document.getElementById("gvGestor")&&document.getElementById("gvGestor").hidden) return;
+    if(t.k==="acessos"&&document.getElementById("gvAcessos")&&document.getElementById("gvAcessos").hidden) return;
     if(t.g!==grp){ grp=t.g; h+='<h5>'+esc(grp)+'</h5>'; }
     h+='<details><summary>'+esc(t.n)+'</summary><div class="ga-gb"><p>'+esc(t.p)+'</p><ol>'+t.s.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ol><div class="ga-tip">💡 '+esc(t.d)+'</div><div class="ga-gbtns">'+(t.k?'<button type="button" class="ga-go" data-go="'+t.k+'">Abrir '+esc(t.n)+' →</button>':'')+'<button type="button" class="ga-copy" data-ask="'+i+'">Tirar dúvida com a IA</button></div></div></details>';
   });
