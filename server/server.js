@@ -169,6 +169,7 @@ app.post("/api/pessoas", json2mb, async (req, res) => {
   try { res.json(await db.perfis((req.body || {}).ids)); } catch (e) { trataErro(res, e); }
 });
 app.get("/api/ai/limits", (req, res) => res.json(ai.limites()));
+app.get("/api/ai/uso", (req, res) => ai.uso(req, res, req.gv).catch(e => trataErro(res, e)));
 app.get("/api/ai/diagnostico", (req, res) => { if (!req.gv || !req.gv.master) return res.status(403).json({ code: "forbidden", message: "Só o franqueador pode testar a IA." }); ai.diagnostico(req, res).catch(e => trataErro(res, e)); });
 app.post("/api/ai/sample", express.json({ limit: "30mb" }), (req, res) => ai.sample(req, res, req.gv).catch(e => trataErro(res, e)));
 

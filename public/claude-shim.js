@@ -140,7 +140,21 @@
       fr.readAsDataURL(b);
     });
   }
+  // Nome da tela de onde a IA foi chamada (vai para o relatório de uso por função)
+  function funcaoAtual() {
+    try {
+      var d = (window.top && window.top.document) || document;
+      var b = d.querySelector('#gvNav button[aria-current="page"]');
+      if (b) { var t = Array.prototype.filter.call(b.childNodes, function (n) { return n.nodeType === 3; }).map(function (n) { return n.textContent; }).join("").trim(); if (t) return t; }
+    } catch (e) {}
+    if (/campanhas/i.test(location.pathname)) return "Campanhas e brindes";
+    return "Outros";
+  }
+  function avisarUso() { try { (window.top || window).dispatchEvent(new CustomEvent("gv-ia-uso")); } catch (e) { try { window.dispatchEvent(new CustomEvent("gv-ia-uso")); } catch (x) {} } }
   async function sample(input, opts) {
+    try { return await sampleBruto(input, opts); } finally { avisarUso(); }
+  }
+  async function sampleBruto(input, opts) {
     opts = opts || {};
     var imgs = opts.images ? (Array.isArray(opts.images) ? opts.images : [opts.images]) : [];
     var images = [];
@@ -153,7 +167,7 @@
     if (opts.signal) { if (opts.signal.aborted) ctl.abort(); else opts.signal.addEventListener("abort", function () { ctl.abort(); }); }
     var texto = "";
     var r;
-    try { r = await api("/api/ai/sample", { input: input, images: images, modelTier: opts.modelTier || "default" }, { signal: ctl.signal }); }
+    try { r = await api("/api/ai/sample", { input: input, images: images, modelTier: opts.modelTier || "default", feature: String(opts.feature || funcaoAtual()).slice(0, 80) }, { signal: ctl.signal }); }
     catch (e) { if (ctl.signal.aborted) throw erro("cancelled", "Cancelado.", { text: texto }); throw e; }
     if (!r.ok) { var j = null; try { j = await r.json(); } catch (e) {} throw erro((j && j.code) || "unavailable", (j && j.message) || "IA indisponível."); }
     var leitor = r.body.getReader(), dec = new TextDecoder(), buf = "", fim = null;
@@ -237,7 +251,36 @@
         location.replace("/login");
       });
     };
+    var bar = document.createElement("button");
+    bar.type = "button"; bar.id = "gvIaUso"; bar.title = "Ver o uso de IA do mês";
+    bar.setAttribute("style", "display:block;width:100%;margin:10px 0 2px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer");
+    bar.innerHTML = '<span style="display:flex;justify-content:space-between;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.03em"><span>IA DO MÊS</span><span data-p>…</span></span>' +
+      '<span style="display:block;height:8px;margin:5px 0 4px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden"><span data-f style="display:block;height:100%;width:0;border-radius:99px;background:#3ccf8e;transition:width .4s"></span></span>' +
+      '<span data-t style="display:block;font-size:11px;opacity:.9"></span>';
+    bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", "100");
+    bar.onclick = function () { var b = document.querySelector('#gvNav button[data-k="uso"]'); if (b) b.click(); };
+    d.insertBefore(bar, d.querySelector("a") || d.querySelector("button:not(#gvIaUso)"));
     if (antes) alvo.insertBefore(d, antes); else alvo.appendChild(d);
+    atualizarUso();
   }
+  var fmtUsd = function (v) { return (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "USD" }); };
+  var tUso = null;
+  async function atualizarUso() {
+    try {
+      var r = await fetch("/api/ai/uso", { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!r.ok) return;
+      var u = await r.json(); window.GV_USO = u;
+      try { window.dispatchEvent(new CustomEvent("gv-uso-atualizado", { detail: u })); } catch (e) {}
+      var bar = document.getElementById("gvIaUso"); if (!bar) return;
+      var rest = Math.round(u.restantePct), cor = u.bloqueado || rest <= 10 ? "#ff6b5b" : rest <= 30 ? "#ffc93c" : "#3ccf8e";
+      bar.querySelector("[data-p]").textContent = u.bloqueado ? "Limite atingido" : rest + "% restante";
+      var f = bar.querySelector("[data-f]"); f.style.width = Math.min(100, u.usadoPct) + "%"; f.style.background = cor;
+      bar.querySelector("[data-t]").textContent = u.bloqueado ? "Renova em " + u.ciclo.renovaEm : fmtUsd(u.gasto) + " de " + fmtUsd(u.limite) + " · renova em " + u.ciclo.renovaEm;
+      bar.setAttribute("aria-valuenow", String(Math.round(u.usadoPct)));
+      bar.setAttribute("aria-label", "Uso de IA do mês: " + fmtUsd(u.gasto) + " de " + fmtUsd(u.limite) + ", " + rest + "% restante");
+    } catch (e) {}
+  }
+  window.GV_ATUALIZAR_USO = atualizarUso;
+  window.addEventListener("gv-ia-uso", function () { clearTimeout(tUso); tUso = setTimeout(atualizarUso, 600); });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", barraConta); else barraConta();
 })();

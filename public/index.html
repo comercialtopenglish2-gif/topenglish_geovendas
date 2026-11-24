@@ -410,6 +410,7 @@ header.top{border-bottom:3px solid #FFB400}
     <p class="gv-grp">Conta</p>
     <button type="button" data-k="v:perfil"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 10h3M15 14h3"/></svg>Perfil do negócio</button>
     <button type="button" data-k="v:historico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Histórico</button>
+    <button type="button" data-k="uso"><svg viewBox="0 0 24 24"><path d="M4 20V14M9 20V9M14 20v-8M19 20V4"/><path d="M2 20h20"/></svg>Uso de IA</button>
     <button type="button" data-k="v:metodo" id="gvMetodo" hidden><svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg>Método CNC</button>
   </nav>
   <div class="gv-theme">
@@ -621,6 +622,7 @@ header.top{border-bottom:3px solid #FFB400}
 
   <div id="view-vend" hidden style="margin-top:16px"><div id="vendHost"></div></div>
   <div id="view-funil" hidden style="margin-top:16px"><div id="funilHost"></div></div>
+  <div id="view-uso" hidden style="margin-top:16px"></div>
   <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
 </div>
 <footer class="site-foot"><div><b>GeoVenda</b> · Processos Comerciais e Inteligência de praça para vender mais!</div><div>by <b>CNC Training &amp; Consulting</b></div></footer>
@@ -1700,7 +1702,8 @@ function initDicas(){
 /* ---------------- views ---------------- */
 function switchView(v){
   S.view=v; document.querySelectorAll("#vtabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));
-  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp";
+  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; $("#view-uso").hidden=v!=="uso"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp"||v==="uso";
+  if(v==="uso"&&window.GV_USO_TELA) window.GV_USO_TELA();
   if(v==="camp"){ const fr=$("#campFrame"); if(!fr.src) fr.src="/campanhas"; /* altura fixa na tela: as janelas (lançar, importar) abrem sempre visíveis */ }
   if(v==="vend"&&window.RADAR) window.RADAR._n();
   if(v==="funil"&&window.GEOFUNIL) window.GEOFUNIL._shown();
@@ -7759,9 +7762,9 @@ render();
 <script>
 (function(){
 const $q=s=>document.querySelector(s);
-const LABEL={"camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
+const LABEL={"uso": ["Conta", "Uso de IA"], "camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
 let funilView=(window.GEOFUNIL&&GEOFUNIL.atual())||"painel";
-let radarView=!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
+let radarView=!$q("#view-uso").hidden?"uso":!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
 function paint(){
   const k=radarView==="vend"?"v:"+vendView:radarView==="funil"?"f:"+funilView:radarView, nk=k==="v:cadastro"?"v:perfil":k;
   document.querySelectorAll("#gvNav button").forEach(b=>{ if(b.dataset.k===nk) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
@@ -7822,6 +7825,95 @@ paint();
 })();
 </script>
 
+
+<style>
+/* Conta › Uso de IA: limite mensal, gráfico diário e gasto por função */
+#view-uso .uso-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+#view-uso h2{font-family:var(--f-disp);font-size:24px;margin:0 0 4px;letter-spacing:.01em}
+#view-uso h3{font-family:var(--f-disp);font-size:19px;margin:0 0 2px}
+#view-uso .uso-sub{color:var(--muted);margin:0 0 14px;font-size:13.5px}
+#view-uso .uso-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+#view-uso .uso-kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface2)}
+#view-uso .uso-kpi small{display:block;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+#view-uso .uso-kpi b{display:block;font-size:24px;font-family:var(--f-disp);margin-top:4px}
+#view-uso .uso-kpi span{font-size:12.5px;color:var(--muted)}
+#view-uso .uso-bar{height:16px;border-radius:99px;background:var(--line2);overflow:hidden;margin-top:6px}
+#view-uso .uso-bar i{display:block;height:100%;border-radius:99px;transition:width .5s}
+#view-uso .uso-barl{display:flex;justify-content:space-between;font-size:13px;margin-top:6px;color:var(--muted)}
+#view-uso .uso-alert{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--alert-soft);color:var(--ink);font-size:13.5px}
+#view-uso .uso-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+#view-uso svg text{font-family:var(--f-body)}
+#view-uso table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+#view-uso th{text-align:left;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 6px;border-bottom:1px solid var(--line)}
+#view-uso td{padding:9px 6px;border-bottom:1px solid var(--line2)}
+#view-uso td.n,#view-uso th.n{text-align:right;font-variant-numeric:tabular-nums}
+#view-uso .uso-vazio{padding:26px 10px;text-align:center;color:var(--muted)}
+#view-uso .uso-nota{font-size:12px;color:var(--muted);margin-top:10px}
+@media (max-width:900px){#view-uso .uso-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#view-uso .uso-grid{grid-template-columns:1fr}}
+</style>
+<script>
+(function(){
+const box=document.getElementById("view-uso"); if(!box) return;
+const esc=t=>String(t??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd=v=>(v||0).toLocaleString("pt-BR",{style:"currency",currency:"USD"});
+const usdF=v=>v>0&&v<0.01?"< US$ 0,01":usd(v);
+const cor=u=>u.bloqueado||u.restantePct<=10?"var(--alert)":u.restantePct<=30?"var(--warn)":"var(--accent)";
+const dm=iso=>iso.slice(8,10)+"/"+iso.slice(5,7);
+function dias(u){ // todos os dias do ciclo até hoje
+  const out=[], hoje=new Date().toLocaleDateString("en-CA",{timeZone:"America/Sao_Paulo"});
+  const por=Object.fromEntries((u.diario||[]).map(d=>[d.dia,d]));
+  let d=new Date(u.ciclo.inicio+"T12:00:00Z"); const fim=u.ciclo.fim;
+  while(true){ const k=d.toISOString().slice(0,10); if(k>=fim||k>hoje) break; out.push({dia:k,custo:(por[k]||{}).custo||0,chamadas:(por[k]||{}).chamadas||0}); d.setUTCDate(d.getUTCDate()+1); }
+  return out;
+}
+function graficoDiario(u){
+  const ds=dias(u); if(!ds.length) return '<div class="uso-vazio">O ciclo começou hoje.</div>';
+  const W=640,H=230,L=70,R=12,T=14,B=34, max=Math.max(...ds.map(d=>d.custo),0.01);
+  const passo=max>1?0.5:max>0.2?0.1:max>0.05?0.02:0.01, topo=Math.ceil(max/passo)*passo, ticks=[];
+  for(let v=0;v<=topo+1e-9;v+=passo) ticks.push(v); while(ticks.length>6){ ticks.splice(1,ticks.length-2,...ticks.slice(1,-1).filter((_,i)=>i%2)); }
+  const bw=(W-L-R)/ds.length, y=v=>T+(H-T-B)*(1-v/topo);
+  let g=ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line2)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${esc(usd(v))}</text>`).join("");
+  const cada=Math.ceil(ds.length/10);
+  g+=ds.map((d,i)=>{ const h=Math.max(d.custo>0?2:0,(H-T-B)-(y(d.custo)-T)); const x=L+i*bw+bw*0.18, w=Math.max(2,bw*0.64);
+    return `<g><title>${dm(d.dia)}: ${usdF(d.custo)} em ${d.chamadas} uso(s)</title><rect x="${x}" y="${H-B-h}" width="${w}" height="${h}" rx="3" fill="var(--accent)"/>${i%cada===0?`<text x="${x+w/2}" y="${H-B+16}" text-anchor="middle" font-size="11" fill="var(--muted)">${dm(d.dia)}</text>`:""}</g>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Custo de IA por dia no ciclo">${g}<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--line)"/></svg>`;
+}
+function graficoFuncao(u){
+  const fs=(u.porFuncao||[]).slice(0,8); if(!fs.length) return '<div class="uso-vazio">Sem uso neste ciclo.</div>';
+  const tot=u.gasto||fs.reduce((a,f)=>a+f.custo,0)||1, max=Math.max(...fs.map(f=>f.custo),1e-9), W=420, rowH=40;
+  const H=fs.length*rowH+6;
+  const g=fs.map((f,i)=>{ const y=i*rowH, w=Math.max(3,(W-130)*(f.custo/max));
+    return `<g><title>${esc(f.funcao)}: ${usdF(f.custo)} · ${f.chamadas} uso(s)</title><text x="0" y="${y+13}" font-size="12.5" fill="var(--ink)" font-weight="600">${esc(f.funcao.length>34?f.funcao.slice(0,33)+"…":f.funcao)}</text><rect x="0" y="${y+19}" width="${w}" height="12" rx="4" fill="${i===0?"var(--accent)":"var(--g3)"}"/><text x="${w+8}" y="${y+29}" font-size="12" fill="var(--muted)">${esc(usdF(f.custo))} · ${Math.round(f.custo/tot*100)}%</text></g>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Gasto de IA por função">${g}</svg>`;
+}
+function render(){
+  const u=window.GV_USO;
+  if(!u){ box.innerHTML='<div class="uso-card"><h2>Uso de IA</h2><p class="uso-sub">Carregando o uso do mês…</p></div>'; return; }
+  const top=(u.porFuncao||[])[0];
+  box.innerHTML=`<section class="uso-card"><h2>Uso de IA do mês</h2>
+   <p class="uso-sub">Cada pessoa tem ${esc(usd(u.limite))} por mês para usar a IA do GeoVenda (Carol, Simulador, planos, análises e textos). O valor não acumula: renova todo dia 5. Ciclo atual: ${dm(u.ciclo.inicio)} a ${dm(u.ciclo.fim)} (renova em ${esc(u.ciclo.renovaEm)}).</p>
+   <div class="uso-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(u.usadoPct)}" aria-label="Uso do limite mensal"><i style="width:${Math.min(100,u.usadoPct)}%;background:${cor(u)}"></i></div>
+   <div class="uso-barl"><span>${esc(usd(u.gasto))} usados de ${esc(usd(u.limite))}</span><span><b style="color:var(--ink)">${Math.round(u.restantePct)}%</b> restante</span></div>
+   ${u.bloqueado?`<div class="uso-alert"><b>Limite do mês atingido.</b> A IA fica bloqueada até ${esc(u.ciclo.renovaEm)}, quando o limite volta para ${esc(usd(u.limite))}.</div>`:""}
+   <div class="uso-kpis">
+    <div class="uso-kpi"><small>Usado no ciclo</small><b>${esc(usd(u.gasto))}</b><span>${Math.round(u.usadoPct)}% do limite</span></div>
+    <div class="uso-kpi"><small>Disponível</small><b>${esc(usd(u.restante))}</b><span>${Math.round(u.restantePct)}% restante</span></div>
+    <div class="uso-kpi"><small>Usos da IA</small><b>${u.chamadas}</b><span>${u.chamadas?"média "+esc(usdF(u.gasto/u.chamadas))+" por uso":"nenhum ainda"}</span></div>
+    <div class="uso-kpi"><small>Onde mais gastou</small><b style="font-size:18px">${top?esc(top.funcao):"—"}</b><span>${top?esc(usdF(top.custo)):"sem uso"}</span></div>
+   </div></section>
+   <div class="uso-grid">
+    <section class="uso-card"><h3>Consumo por dia</h3><p class="uso-sub">Quanto a IA custou em cada dia do ciclo. Passe o mouse na barra para ver o valor.</p>${graficoDiario(u)}</section>
+    <section class="uso-card"><h3>Gasto por função</h3><p class="uso-sub">Em quais telas e funções a IA foi mais usada.</p>${graficoFuncao(u)}</section>
+   </div>
+   <section class="uso-card"><h3>Custo de cada função</h3>
+    ${(u.porFuncao||[]).length?`<table><thead><tr><th>Função</th><th class="n">Usos</th><th class="n">Custo total</th><th class="n">Custo médio</th><th class="n">% do gasto</th></tr></thead><tbody>${u.porFuncao.map(f=>`<tr><td>${esc(f.funcao)}</td><td class="n">${f.chamadas}</td><td class="n">${esc(usdF(f.custo))}</td><td class="n">${esc(usdF(f.custo/(f.chamadas||1)))}</td><td class="n">${u.gasto?Math.round(f.custo/u.gasto*100):0}%</td></tr>`).join("")}</tbody></table>`:'<div class="uso-vazio">Você ainda não usou a IA neste ciclo.</div>'}
+    <p class="uso-nota">Valores estimados a partir dos tokens de cada resposta e do preço público por token de cada modelo de IA, em dólar (US$).</p>
+   </section>`;
+}
+window.GV_USO_TELA=()=>{ render(); if(window.GV_ATUALIZAR_USO) window.GV_ATUALIZAR_USO(); };
+window.addEventListener("gv-uso-atualizado",()=>{ if(!box.hidden) render(); });
+})();
+</script>
 <style>
 /* Assistente GeoVenda: balão flutuante de IA sobre os dados internos + arquivos anexados */
 .ga-fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:70;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 20px -6px rgba(0,0,0,.45),0 2px 4px rgba(0,0,0,.15);display:grid;place-items:center;transition:transform .15s}
@@ -8182,6 +8274,7 @@ const GUIA=[
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
  {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, escolha a escola de onde a pessoa é (para quem tem mais de uma unidade), informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
+ {g:"Conta",k:"uso",n:"Uso de IA",p:"Mostra quanto do limite mensal de IA (US$ 10 por pessoa) você já usou, quanto falta, o consumo por dia e em quais funções a IA mais gastou.",s:["No menu, em Conta, clique em Uso de IA (ou na barra IA DO MÊS, no quadro com seu nome).","Veja a barra: quanto já usou e quantos por cento ainda restam.","No gráfico Consumo por dia, passe o mouse nas barras para ver o valor de cada dia.","Em Gasto por função e na tabela, veja onde a IA mais gastou e o custo médio de cada uso."],d:"O limite não acumula: volta para US$ 10 todo dia 5. Se chegar a US$ 10 antes disso, a IA fica bloqueada até o dia 5."},
  {g:"Assistente",k:"",n:"Carol, assistente de vendas (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
 const GUIA_INICIO=[["v:perfil","Cadastre o Perfil do negócio (meta, ticket, público e desafios)."],["radar","Em Praças, escolha estado e serviço e encontre as melhores cidades e bairros."],["v:qualificacao","Registre cada lead novo em Qualificação de leads e responda dentro do limite."],["v:rotina","Em Minha rotina, transforme a meta em números do dia."],["v:acompanhamento","Siga os follow-ups no Acompanhamento e marque o resultado (perdido sempre com motivo)."],["f:lancar","Todo mês, lance os números da escola em Medir › Lançar dados."]];
@@ -8279,6 +8372,9 @@ ${guiaTexto()}
 === FUNIL DA ESCOLA (módulo Medir · GeoFunil: leads e matrículas por fonte, investimento, CPL, CAC, metas, pesquisas de satisfação e pós-venda, conteúdo da escola, ações e influenciadores) ===
 ${dadosFunil()}
 
+=== USO DE IA DO MÊS (Conta > Uso de IA {{abrir:uso}}) ===
+${(()=>{ const u=window.GV_USO; if(!u) return "Ainda carregando."; const f=x=>"US$ "+(x||0).toFixed(2).replace(".",","); return "Limite "+f(u.limite)+" por mês, renova em "+u.ciclo.renovaEm+" (todo dia 5, não acumula). Usado "+f(u.gasto)+" ("+Math.round(u.usadoPct)+"%), restante "+f(u.restante)+" ("+Math.round(u.restantePct)+"%), "+u.chamadas+" usos."+(u.bloqueado?" LIMITE ATINGIDO: IA bloqueada até a renovação.":"")+"\nPor função: "+((u.porFuncao||[]).map(x=>x.funcao+" "+f(x.custo)+" em "+x.chamadas+" usos").join("; ")||"sem uso neste ciclo"); })()}
+
 === CAMPANHAS E BRINDES (módulo Medir) ===
 ${(()=>{ try{ const w=document.getElementById("campFrame").contentWindow; return w&&w.GV_CAMP_RESUMO?w.GV_CAMP_RESUMO():"Tela de campanhas ainda não aberta nesta sessão (os dados podem existir: peça para abrir Medir > Campanhas e brindes {{abrir:camp}} e perguntar de novo)." }catch(e){ return "Indisponível." } })()}`;
 }
@@ -8353,7 +8449,7 @@ async function perguntar(texto,label){
   ctl=new AbortController();
   try{
     if(!sample) throw {code:"not_granted"};
-    const r=await sample(msgs,{cache:false,signal:ctl.signal,onText:({text})=>{ if(text){ d.innerHTML=md(text); log.scrollTop=log.scrollHeight; } }});
+    const r=await sample(msgs,{cache:false,feature:"Carol (assistente)",signal:ctl.signal,onText:({text})=>{ if(text){ d.innerHTML=md(text); log.scrollTop=log.scrollHeight; } }});
     const t=(r&&r.text)||""; d.innerHTML=md(t)||"<p>(sem resposta)</p>"; copyBtn(d,t);
     turns.push({r:"a",text:t}); salvar();
   }catch(e){

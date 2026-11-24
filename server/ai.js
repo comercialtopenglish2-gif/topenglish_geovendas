@@ -18,6 +18,75 @@ export const IMAGENS = { maxCount: 4, maxBytes: 5 * 1024 * 1024, types: ["image/
 
 export const iaLigada = () => !!process.env.ANTHROPIC_API_KEY;
 
+// ---------- custo e limite mensal ----------
+// Preço em US$ por milhão de tokens [entrada, saída]. Pode ser trocado por AI_PRECOS (JSON no mesmo formato).
+// Haiku 5.5 cobra mais quando o pedido passa de 100 mil tokens (campo "longo").
+const PRECOS_PADRAO = {
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-haiku-5-5": { in: 0.10, out: 0.50, longo: { acima: 100000, in: 0.50, out: 2.50 } },
+  "claude-opus-5-5": { in: 4, out: 20 },
+  "claude-sonnet-4-5": { in: 3, out: 15 },
+  "claude-haiku-4-5": { in: 1, out: 5 },
+};
+let PRECOS = PRECOS_PADRAO;
+try { if (process.env.AI_PRECOS) PRECOS = { ...PRECOS_PADRAO, ...JSON.parse(process.env.AI_PRECOS) }; } catch { console.error("IA: AI_PRECOS inválido, usando a tabela padrão."); }
+export function custoUsd(modelo, ti, to) {
+  const p = PRECOS[modelo] || PRECOS["claude-sonnet-5-5"];
+  const f = p.longo && ti > p.longo.acima ? p.longo : p;
+  return ((ti || 0) * f.in + (to || 0) * f.out) / 1e6;
+}
+export const LIMITE_MES_USD = Number(process.env.AI_MONTHLY_USD || 10);
+const DIA_RENOVA = 5;
+const FUSO = "America/Sao_Paulo";
+// Data de hoje no fuso de Brasília, como [ano, mês (1-12), dia]
+function hojeBR(agora = new Date()) {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(agora).split("-").map(Number);
+  return p;
+}
+const iso = (a, m, d) => `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+// Ciclo atual: do dia 5 (00:00 de Brasília) até o dia 5 do mês seguinte
+export function cicloAtual(agora = new Date()) {
+  let [a, m, d] = hojeBR(agora);
+  if (d < DIA_RENOVA) { m -= 1; if (m < 1) { m = 12; a -= 1; } }
+  let a2 = a, m2 = m + 1; if (m2 > 12) { m2 = 1; a2 += 1; }
+  return { inicio: iso(a, m, DIA_RENOVA), fim: iso(a2, m2, DIA_RENOVA) };
+}
+export async function gastoCiclo(pessoa, ciclo = cicloAtual()) {
+  const r = await getPool().query(
+    `SELECT COALESCE(SUM(custo_usd),0)::float AS gasto FROM uso_ia_eventos
+      WHERE pessoa=$1 AND em >= ($2::timestamp AT TIME ZONE '${FUSO}') AND em < ($3::timestamp AT TIME ZONE '${FUSO}')`,
+    [pessoa, ciclo.inicio, ciclo.fim]);
+  return r.rows[0].gasto;
+}
+async function registrarCusto(pessoa, funcao, modelo, ti, to) {
+  const c = custoUsd(modelo, ti, to);
+  await getPool().query("INSERT INTO uso_ia_eventos(pessoa,funcao,modelo,tokens_in,tokens_out,custo_usd) VALUES ($1,$2,$3,$4,$5,$6)",
+    [pessoa, String(funcao || "Outros").slice(0, 80), modelo, ti || 0, to || 0, c]);
+  return c;
+}
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const dataBR = d => { const [a, m, dd] = d.split("-").map(Number); return `${dd} de ${MESES[m - 1]}`; };
+
+// GET /api/ai/uso: resumo do ciclo para a barra e a tela Uso de IA
+export async function uso(req, res, ident) {
+  const ciclo = cicloAtual();
+  const args = [ident.pessoaId, ciclo.inicio, ciclo.fim];
+  const onde = `pessoa=$1 AND em >= ($2::timestamp AT TIME ZONE '${FUSO}') AND em < ($3::timestamp AT TIME ZONE '${FUSO}')`;
+  const [dia, fun, tot] = await Promise.all([
+    getPool().query(`SELECT to_char(em AT TIME ZONE '${FUSO}','YYYY-MM-DD') AS dia, SUM(custo_usd)::float AS custo, COUNT(*)::int AS chamadas FROM uso_ia_eventos WHERE ${onde} GROUP BY 1 ORDER BY 1`, args),
+    getPool().query(`SELECT funcao, SUM(custo_usd)::float AS custo, COUNT(*)::int AS chamadas, SUM(tokens_in)::bigint AS tokens_in, SUM(tokens_out)::bigint AS tokens_out FROM uso_ia_eventos WHERE ${onde} GROUP BY 1 ORDER BY 2 DESC`, args),
+    getPool().query(`SELECT COALESCE(SUM(custo_usd),0)::float AS gasto, COUNT(*)::int AS chamadas FROM uso_ia_eventos WHERE ${onde}`, args),
+  ]);
+  const gasto = tot.rows[0].gasto, limite = LIMITE_MES_USD;
+  const usadoPct = limite > 0 ? Math.min(100, gasto / limite * 100) : 100;
+  res.set("Cache-Control", "no-store").json({
+    limite, gasto, restante: Math.max(0, limite - gasto), usadoPct, restantePct: Math.max(0, 100 - usadoPct),
+    bloqueado: gasto >= limite, chamadas: tot.rows[0].chamadas,
+    ciclo: { inicio: ciclo.inicio, fim: ciclo.fim, renovaEm: dataBR(ciclo.fim) },
+    diario: dia.rows, porFuncao: fun.rows.map(r => ({ ...r, tokens_in: Number(r.tokens_in), tokens_out: Number(r.tokens_out) })),
+  });
+}
+
 function erro(res, status, code, message) {
   if (!res.headersSent) res.status(status).json({ code, message });
   else { res.write(JSON.stringify({ t: "erro", code, message }) + "\n"); res.end(); }
@@ -117,16 +186,20 @@ export async function sample(req, res, ident) {
   let mensagens;
   try { mensagens = montarMensagens(corpo.input, corpo.images); }
   catch (e) { return erro(res, 400, e.code || "invalid_argument", e.message); }
+  const ciclo = cicloAtual();
+  if (await gastoCiclo(ident.pessoaId, ciclo) >= LIMITE_MES_USD)
+    return erro(res, 429, "budget_exhausted", `Você usou todo o limite de IA deste mês (US$ ${LIMITE_MES_USD.toFixed(2).replace(".", ",")}). Ele renova em ${dataBR(ciclo.fim)}.`);
   const n = await contarUso(ident.pessoaId);
   if (n > LIMITE_DIA) return erro(res, 429, "rate_limited", "Limite diário de IA atingido. Tente amanhã.");
 
   const ctl = new AbortController();
   res.on("close", () => { if (!res.writableEnded) ctl.abort(); });
-  let up;
+  let up, modeloUsado = MODELOS[corpo.modelTier] || MODELOS.default;
+  const funcao = String(corpo.feature || "Outros").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80) || "Outros";
   try {
     const r = await chamarComReserva({ max_tokens: Math.min(Number(corpo.maxTokens) || MAX_TOKENS, MAX_TOKENS), messages: mensagens, stream: true }, MODELOS[corpo.modelTier] || MODELOS.default, ctl.signal);
     if (r.erro) return erro(res, r.erro.status, r.erro.code === "model_not_found" ? "unavailable" : r.erro.code, r.erro.message);
-    up = r.up;
+    up = r.up; modeloUsado = r.modelo;
   } catch (e) {
     if (!ctl.signal.aborted) console.error("IA: falha de rede ao chamar a Anthropic:", e && e.message);
     return erro(res, 502, ctl.signal.aborted ? "cancelled" : "unavailable", "Não consegui falar com a IA agora. Tente de novo em instantes.");
@@ -150,15 +223,16 @@ export async function sample(req, res, ident) {
       }
     }
   } catch (e) {
-    if (ctl.signal.aborted) return; // o usuário clicou em Parar
+    if (ctl.signal.aborted) { if (ti || to) registrarCusto(ident.pessoaId, funcao, modeloUsado, ti, to).catch(() => {}); return; } // o usuário clicou em Parar
     return erro(res, 502, "unavailable", "A resposta da IA foi interrompida.");
   }
   somarTokens(ident.pessoaId, ti, to).catch(() => {});
+  registrarCusto(ident.pessoaId, funcao, modeloUsado, ti, to).catch(e => console.error("IA: não consegui registrar o custo:", e && e.message));
   if (parada === "refusal") { res.write(JSON.stringify({ t: "erro", code: "refused", message: "A IA recusou este pedido." }) + "\n"); return res.end(); }
   res.write(JSON.stringify({ t: "fim", text: texto, truncated: parada === "max_tokens" }) + "\n");
   res.end();
 }
 
 export function limites() {
-  return { maxPromptBytes: MAX_PROMPT_BYTES, images: iaLigada() ? IMAGENS : false };
+  return { maxPromptBytes: MAX_PROMPT_BYTES, images: iaLigada() ? IMAGENS : false, limiteMesUsd: LIMITE_MES_USD };
 }

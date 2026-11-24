@@ -66,6 +66,8 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 
 - **Chave:** a chave da Anthropic fica só no Railway (`ANTHROPIC_API_KEY`). Sem a chave, a IA fica desligada e as telas mostram "IA indisponível".
 - **Limite:** `AI_DAILY_CALLS` chamadas por pessoa por dia (padrão 150). O uso fica registrado na tabela `uso_ia`.
+- **Limite mensal em dólar:** cada pessoa (master ou franqueador) tem `AI_MONTHLY_USD` por mês (padrão US$ 10). O ciclo renova todo dia 5, à meia-noite de Brasília, e não acumula. Ao chegar no limite, `/api/ai/sample` responde `budget_exhausted` até o próximo dia 5. O custo de cada chamada (tokens × preço do modelo) fica na tabela `uso_ia_eventos`, com a função (tela) de onde veio. Preços padrão em `server/ai.js`; para trocar, use `AI_PRECOS` (JSON). A barra fica no quadro do usuário no menu e o detalhe em Conta › Uso de IA (`GET /api/ai/uso`).
+- **Modelos de reserva:** `AI_MODEL_FALLBACK` (lista separada por vírgula) é usada se o modelo configurado não existir. `GET /api/ai/diagnostico` (só franqueador) testa a IA e mostra o motivo de falha.
 - **Modelos:** variam por nível (`quick`, `default`, `complex`) e podem ser trocados em `AI_MODEL_QUICK`, `AI_MODEL_DEFAULT` e `AI_MODEL_COMPLEX`. **Confira os nomes atuais em https://docs.claude.com antes do deploy.**
 
 ## Rodar localmente (sem senhas reais)
