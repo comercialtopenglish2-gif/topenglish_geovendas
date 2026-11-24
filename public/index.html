@@ -624,7 +624,7 @@ header.top{border-bottom:3px solid #FFB400}
   <div id="view-vend" hidden style="margin-top:16px"><div id="vendHost"></div></div>
   <div id="view-funil" hidden style="margin-top:16px"><div id="funilHost"></div></div>
   <div id="view-uso" hidden style="margin-top:16px"></div>
-  <div id="view-acessos" hidden style="margin-top:16px"><iframe id="acessosFrame" title="Unidades e acessos" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
+  <div id="view-acessos" hidden style="margin-top:16px"><div style="margin:0 0 10px"><button type="button" id="acessosVoltar" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 14px;font:600 14px/1 var(--f-body);cursor:pointer"><span aria-hidden="true">←</span> Voltar</button></div><iframe id="acessosFrame" title="Unidades e acessos" style="display:block;width:100%;height:calc(100vh - 180px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
   <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
 </div>
 <footer class="site-foot"><div><b>GeoVenda</b> · Processos Comerciais e Inteligência de praça para vender mais!</div><div>by <b>CNC Training &amp; Consulting</b></div></footer>
@@ -649,6 +649,13 @@ header.top{border-bottom:3px solid #FFB400}
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<script>
+/* /acessos aberto direto no navegador volta para cá com ?tela=acessos: abre a tela com o menu ao lado */
+(function(){ try{ const t=new URLSearchParams(location.search).get("tela");
+  if(t==="acessos"&&window.GV_SESSION&&window.GV_SESSION.master){ localStorage.setItem("radar_view","acessos"); }
+  if(t) history.replaceState(null,"",location.pathname);
+}catch(e){} })();
+</script>
 <script>
 /* PDFs do GeoVenda: logo pequena no cabeçalho e página final da CNC Training & Consulting */
 window.GV_PDF_LOGO=function(doc,x,y,w){
@@ -7793,8 +7800,11 @@ if(window.GV_SESSION&&window.GV_SESSION.master) $q("#gvAcessos").hidden=false;
     limpa(); new MutationObserver(limpa).observe(d.body,{childList:true,subtree:true});
   }catch(e){} });
 })();
+let telaAnterior="v:inicio";
+$q("#acessosVoltar").onclick=()=>{ const b=$q('#gvNav button[data-k="'+telaAnterior+'"]')||$q('#gvNav button[data-k="v:inicio"]'); if(b&&!b.hidden) b.click(); };
 document.querySelectorAll("#gvNav button").forEach(b=>b.onclick=()=>{
   const k=b.dataset.k;
+  if(k==="acessos"){ const at=$q('#gvNav button[aria-current="page"]'); if(at&&at.dataset.k!=="acessos") telaAnterior=at.dataset.k; }
   if(k.startsWith("v:")){ if(window.RADAR) RADAR.ir("vend"); if(window.VENDEDOR) VENDEDOR.show(k.slice(2)); }
   else if(k.startsWith("f:")){ funilView=k.slice(2); if(window.RADAR) RADAR.ir("funil"); if(window.GEOFUNIL) GEOFUNIL.show(funilView); }
   else if(window.RADAR) RADAR.ir(k);

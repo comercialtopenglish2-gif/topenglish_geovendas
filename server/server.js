@@ -200,6 +200,8 @@ app.delete("/api/acessos/:email", soMaster, async (req, res) => {
 });
 app.get(["/acessos", "/unidades"], (req, res) => {
   if (!req.gv.master) return res.status(403).type("html").send(paginaAviso("Somente o franqueador libera acessos."));
+  // aberta direto no navegador (não dentro do GeoVenda): leva para o app, com o menu ao lado
+  if (req.get("sec-fetch-dest") === "document") return res.redirect(302, "/?tela=acessos");
   res.set("Cache-Control", "private, no-store").sendFile(path.join(RAIZ, "server", "paginas", "acessos.html"));
 });
 // Campanhas e brindes: código da franqueadora para ver todas as unidades (valor em CAMP_CODIGO_REDE, no Railway)
