@@ -369,6 +369,7 @@ header.top{border-bottom:3px solid #FFB400}
     <p class="gv-grp"><span class="gv-n">2</span>Demanda</p>
     <button type="button" data-k="v:conteudo"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14l2 2 4-4"/></svg>Agenda de conteúdo</button>
     <button type="button" data-k="dicas"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Dicas da praça</button>
+    <button type="button" data-k="links"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Links rastreáveis</button>
     <p class="gv-grp"><span class="gv-n">3</span>Prospecção</p>
     <button type="button" data-k="v:captacao"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Captação externa</button>
     <p class="gv-grp"><span class="gv-n">4</span>Atendimento</p>
@@ -624,6 +625,7 @@ header.top{border-bottom:3px solid #FFB400}
   <div id="view-vend" hidden style="margin-top:16px"><div id="vendHost"></div></div>
   <div id="view-funil" hidden style="margin-top:16px"><div id="funilHost"></div></div>
   <div id="view-uso" hidden style="margin-top:16px"></div>
+  <div id="view-links" hidden style="margin-top:16px"></div>
   <div id="view-acessos" hidden style="margin-top:16px"><div style="margin:0 0 10px"><button type="button" id="acessosVoltar" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 14px;font:600 14px/1 var(--f-body);cursor:pointer"><span aria-hidden="true">←</span> Voltar</button></div><iframe id="acessosFrame" title="Unidades e acessos" style="display:block;width:100%;height:calc(100vh - 180px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
   <div id="view-camp" hidden style="margin-top:16px"><iframe id="campFrame" title="Campanhas e brindes" style="display:block;width:100%;height:calc(100vh - 130px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:#fff"></iframe></div>
 </div>
@@ -1711,7 +1713,8 @@ function initDicas(){
 /* ---------------- views ---------------- */
 function switchView(v){
   S.view=v; document.querySelectorAll("#vtabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));
-  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; $("#view-uso").hidden=v!=="uso"; $("#view-acessos").hidden=v!=="acessos"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp"||v==="uso"||v==="acessos";
+  $("#view-radar").hidden=v!=="radar"; $("#view-comp").hidden=v!=="comp"; $("#view-hor").hidden=v!=="hor"; $("#view-dicas").hidden=v!=="dicas"; $("#view-vend").hidden=v!=="vend"; $("#view-funil").hidden=v!=="funil"; $("#view-camp").hidden=v!=="camp"; $("#view-uso").hidden=v!=="uso"; $("#view-acessos").hidden=v!=="acessos"; $("#view-links").hidden=v!=="links"; document.querySelector(".controls").hidden=v==="vend"||v==="funil"||v==="camp"||v==="uso"||v==="acessos"||v==="links";
+  if(v==="links"&&window.GV_LINKS_TELA) window.GV_LINKS_TELA();
   if(v==="acessos"){ const fr=$("#acessosFrame"); if(!fr.src) fr.src="/acessos"; else { try{ fr.contentWindow.location.reload(); }catch(e){} } }
   if(v==="uso"&&window.GV_USO_TELA) window.GV_USO_TELA();
   if(v==="camp"){ const fr=$("#campFrame"); if(!fr.src) fr.src="/campanhas"; /* altura fixa na tela: as janelas (lançar, importar) abrem sempre visíveis */ }
@@ -7772,9 +7775,9 @@ render();
 <script>
 (function(){
 const $q=s=>document.querySelector(s);
-const LABEL={"acessos": ["Conta", "Unidades e acessos"], "uso": ["Conta", "Uso de IA"], "camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
+const LABEL={"links": ["Demanda", "Links rastreáveis"], "acessos": ["Conta", "Unidades e acessos"], "uso": ["Conta", "Uso de IA"], "camp": ["Medir", "Campanhas e brindes"], "v:inicio": ["Visão geral", "Início"], "radar": ["Mercado", "Praças"], "comp": ["Mercado", "Comparativo"], "hor": ["Mercado", "Horários e mídias"], "v:conteudo": ["Demanda", "Agenda de conteúdo"], "dicas": ["Demanda", "Dicas da praça"], "v:captacao": ["Prospecção", "Captação externa"], "v:qualificacao": ["Atendimento", "Qualificação de leads"], "v:rotina": ["Atendimento", "Minha rotina"], "v:simulador": ["Atendimento", "Simulador"], "v:aula": ["Aula experimental", "Aula experimental e visita"], "v:oferta": ["Oferta e objeções", "Apresentação da oferta"], "v:objecoes": ["Oferta e objeções", "Objeções"], "v:concessao": ["Oferta e objeções", "Concessão estratégica"], "v:print": ["Fechamento", "Analisar print"], "v:perdas": ["Fechamento", "Motivos de perda"], "v:acompanhamento": ["Follow-up", "Acompanhamento"], "v:gestor": ["Follow-up", "Painel do gestor"], "v:checklist": ["Follow-up", "Checklist semanal"], "v:reativacao": ["Follow-up", "Reativação de base"], "v:renovacao": ["Indicação e renovação", "Renovação e rematrícula"], "v:upsell": ["Indicação e renovação", "Ofertas para clientes"], "v:indicacao": ["Indicação e renovação", "Programa de indicação"], "v:pipeline": ["Medir", "Pipeline e previsão"], "v:ranking": ["Medir", "Ranking da equipe"], "v:coaching": ["Medir", "Consultor em Treinamentos"], "v:perfil": ["Conta", "Perfil do negócio"], "v:cadastro": ["Conta", "Cadastro do negócio"], "v:historico": ["Conta", "Histórico"], "v:metodo": ["Conta", "Método CNC"], "f:painel": ["Medir", "Painel do funil"], "f:lancar": ["Medir", "Lançar dados"], "f:leads": ["Medir", "Leads e investimento"], "f:pesquisas": ["Medir", "Pesquisas"], "f:conteudo": ["Medir", "Conteúdo da escola"], "f:acoes": ["Medir", "Ações e influência"], "f:importar": ["Medir", "Importar / exportar"], "f:unidades": ["Medir", "Escolas"]};
 let funilView=(window.GEOFUNIL&&GEOFUNIL.atual())||"painel";
-let radarView=!$q("#view-acessos").hidden?"acessos":!$q("#view-uso").hidden?"uso":!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
+let radarView=!$q("#view-links").hidden?"links":!$q("#view-acessos").hidden?"acessos":!$q("#view-uso").hidden?"uso":!$q("#view-camp").hidden?"camp":!$q("#view-funil").hidden?"funil":!$q("#view-vend").hidden?"vend":!$q("#view-dicas").hidden?"dicas":!$q("#view-comp").hidden?"comp":!$q("#view-hor").hidden?"hor":"radar", vendView=(window.VENDEDOR&&window.VENDEDOR.atual&&window.VENDEDOR.atual())||"inicio";
 function paint(){
   const k=radarView==="vend"?"v:"+vendView:radarView==="funil"?"f:"+funilView:radarView, nk=k==="v:cadastro"?"v:perfil":k;
   document.querySelectorAll("#gvNav button").forEach(b=>{ if(b.dataset.k===nk) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
@@ -7846,6 +7849,137 @@ paint();
 </script>
 
 
+<style>
+/* Demanda › Links rastreáveis: link curto que conta cliques e leva ao WhatsApp ou ao site */
+#view-links .lk-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+#view-links h2{font-family:var(--f-disp);font-size:24px;margin:0 0 4px}
+#view-links h3{font-family:var(--f-disp);font-size:19px;margin:0 0 2px}
+#view-links .lk-sub{color:var(--muted);margin:0 0 14px;font-size:13.5px}
+#view-links label.lk-f{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--muted)}
+#view-links input,#view-links textarea,#view-links select{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+#view-links textarea{min-height:70px;resize:vertical}
+#view-links .lk-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+#view-links .lk-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+#view-links .lk-seg button{border:0;background:var(--surface);color:var(--ink);padding:8px 16px;font:600 13.5px/1 var(--f-body);cursor:pointer}
+#view-links .lk-seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+#view-links .lk-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+#view-links .lk-chip{border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:99px;padding:6px 12px;font:500 13px/1.2 var(--f-body);cursor:pointer}
+#view-links .lk-chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:700}
+#view-links .lk-btn{border:0;border-radius:10px;padding:10px 16px;background:var(--accent);color:var(--accent-ink);font:700 14px/1 var(--f-body);cursor:pointer}
+#view-links .lk-btn.g{background:var(--surface);color:var(--ink);border:1px solid var(--line);font-weight:600;padding:6px 10px;font-size:12.5px}
+#view-links .lk-btn:disabled{opacity:.6;cursor:wait}
+#view-links .lk-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#view-links .lk-kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface2)}
+#view-links .lk-kpi small{display:block;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+#view-links .lk-kpi b{display:block;font-size:24px;font-family:var(--f-disp);margin-top:4px}
+#view-links .lk-kpi span{font-size:12.5px;color:var(--muted)}
+#view-links .lk-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+#view-links table{width:100%;border-collapse:collapse;font-size:13.5px}
+#view-links th{text-align:left;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 6px;border-bottom:1px solid var(--line)}
+#view-links td{padding:9px 6px;border-bottom:1px solid var(--line2);vertical-align:middle}
+#view-links td.n,#view-links th.n{text-align:right;font-variant-numeric:tabular-nums}
+#view-links .lk-url{font-family:var(--f-mono);font-size:12.5px;word-break:break-all}
+#view-links .lk-off td{opacity:.55}
+#view-links .lk-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#view-links .lk-vazio{padding:22px 10px;text-align:center;color:var(--muted)}
+#view-links .lk-msg{font-size:12.5px;color:var(--muted);margin-top:3px;max-width:380px}
+#view-links .lk-tw{overflow-x:auto}
+@media (max-width:900px){#view-links .lk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#view-links .lk-grid,#view-links .lk-row{grid-template-columns:1fr}}
+</style>
+<script>
+(function(){
+const box=document.getElementById("view-links"); if(!box) return;
+const esc=t=>String(t??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toastL=m=>{ try{ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastL.t); toastL.t=setTimeout(()=>t.classList.remove("show"),2600); }catch(e){} };
+const api=async(m,p,b)=>{ const r=await fetch(p,{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json",Accept:"application/json"},body:b?JSON.stringify(b):undefined}); const j=await r.json().catch(()=>null); if(!r.ok) throw new Error((j&&j.message)||"Não consegui concluir agora."); return j; };
+const ORDEM=["ig","igs","fb","tt","yt","gmb","wa","li","site","qr","ind","email","outro"];
+const st=(k,d)=>{ try{ const v=localStorage.getItem("gv_links_"+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } };
+const sv=(k,v)=>{ try{ localStorage.setItem("gv_links_"+k,JSON.stringify(v)); }catch(e){} };
+let D=null, tipo=st("tipo","whatsapp"), sel=new Set(st("redes",["ig","fb","gmb"])), carregando=false;
+const curto=c=>location.origin+"/l/"+c;
+const dm=iso=>iso.slice(8,10)+"/"+iso.slice(5,7);
+const quando=t=>t?new Date(t).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
+function numPadrao(){ const n=st("num",""); if(n) return n; try{ const u=window.GV_SESSION&&window.GV_SESSION.unidade; }catch(e){} return ""; }
+const MSG_PADRAO="Olá! Vim pelo {rede} e quero saber mais sobre os cursos de inglês.";
+function graficoDias(){
+  const hoje=new Date(), ds=[]; for(let i=D.dias-1;i>=0;i--){ const d=new Date(hoje.getTime()-i*864e5); ds.push(d.toLocaleDateString("en-CA",{timeZone:"America/Sao_Paulo"})); }
+  const por={}; D.serie.forEach(x=>{ por[x.dia]=(por[x.dia]||0)+x.cliques; });
+  const vals=ds.map(d=>por[d]||0), max=Math.max(1,...vals), W=640,H=210,L=40,R=10,T=12,B=30, bw=(W-L-R)/ds.length;
+  const topo=max<=4?4:Math.ceil(max/4)*4, y=v=>T+(H-T-B)*(1-v/topo), ticks=[0,topo/4,topo/2,topo*3/4,topo];
+  let g=ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line2)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${Math.round(v)}</text>`).join("");
+  const cada=Math.ceil(ds.length/10);
+  g+=ds.map((d,i)=>{ const v=vals[i], h=(H-T-B)-(y(v)-T), x=L+i*bw+bw*.18, w=Math.max(2,bw*.64);
+    return `<g><title>${dm(d)}: ${v} clique(s)</title>${v?`<rect x="${x}" y="${H-B-h}" width="${w}" height="${h}" rx="3" fill="var(--accent)"/>`:""}${i%cada===0?`<text x="${x+w/2}" y="${H-B+16}" text-anchor="middle" font-size="11" fill="var(--muted)">${dm(d)}</text>`:""}</g>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Cliques por dia">${g}<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--line)"/></svg>`;
+}
+function porRede(){ const r={}; D.serie.forEach(x=>{ r[x.rede]=(r[x.rede]||0)+x.cliques; }); return Object.entries(r).sort((a,b)=>b[1]-a[1]); }
+function graficoRedes(){
+  const rs=porRede(); if(!rs.length) return '<div class="lk-vazio">Ainda sem cliques no período.</div>';
+  const tot=rs.reduce((a,x)=>a+x[1],0), max=rs[0][1], W=420, rowH=38;
+  return `<svg viewBox="0 0 ${W} ${rs.length*rowH+6}" width="100%" role="img" aria-label="Cliques por rede social">${rs.map(([k,v],i)=>{ const y=i*rowH, w=Math.max(3,(W-110)*(v/max));
+    return `<g><title>${esc(D.redes[k]||k)}: ${v} clique(s)</title><text x="0" y="${y+13}" font-size="12.5" font-weight="600" fill="var(--ink)">${esc(D.redes[k]||k)}</text><rect x="0" y="${y+19}" width="${w}" height="12" rx="4" fill="${i===0?"var(--accent)":"var(--g3)"}"/><text x="${w+8}" y="${y+29}" font-size="12" fill="var(--muted)">${v} · ${Math.round(v/tot*100)}%</text></g>`; }).join("")}</svg>`;
+}
+function form(){
+  const num=numPadrao();
+  return `<section class="lk-card"><h3>Criar links</h3><p class="lk-sub">Escolha para onde o link leva e em quais redes você vai usar. Sai um link por rede, para saber de onde vem cada clique.</p>
+   <div class="lk-seg" role="group" aria-label="Destino"><button type="button" data-tipo="whatsapp" aria-pressed="${tipo==="whatsapp"}">WhatsApp</button><button type="button" data-tipo="site" aria-pressed="${tipo==="site"}">Site</button></div>
+   <div class="lk-f" style="font-size:12.5px;font-weight:600;color:var(--muted)">Redes sociais e canais</div>
+   <div class="lk-chips">${ORDEM.map(k=>`<button type="button" class="lk-chip" data-rede="${k}" aria-pressed="${sel.has(k)}">${esc((D&&D.redes[k])||k)}</button>`).join("")}</div>
+   ${tipo==="whatsapp"?`<div class="lk-row"><label class="lk-f">Número do WhatsApp (com DDD)<input id="lkNum" type="tel" inputmode="tel" placeholder="(35) 99999-0000" value="${esc(num)}"></label><label class="lk-f">Nome do link (opcional)<input id="lkNome" maxlength="60" placeholder="Ex.: WhatsApp da recepção"></label></div>
+   <label class="lk-f" style="margin-bottom:12px">Mensagem que já vem escrita (use {rede} para o nome da rede)<textarea id="lkMsg" maxlength="500">${esc(st("msg",MSG_PADRAO))}</textarea></label>`
+   :`<div class="lk-row"><label class="lk-f">Endereço do site ou página<input id="lkUrl" type="url" placeholder="https://www.suaescola.com.br/matricula" value="${esc(st("url",""))}"></label><label class="lk-f">Campanha (opcional)<input id="lkCamp" maxlength="50" placeholder="Ex.: Volta às aulas"></label></div>
+   <label class="lk-f" style="margin-bottom:12px">Nome do link (opcional)<input id="lkNome" maxlength="60" placeholder="Ex.: Página de matrícula"></label>`}
+   <button type="button" class="lk-btn" id="lkCriar">Criar ${sel.size>1?sel.size+" links":"link"}</button>
+  </section>`;
+}
+function tabela(){
+  if(!D.links.length) return '<div class="lk-vazio">Nenhum link criado ainda. Crie o primeiro acima.</div>';
+  return `<div class="lk-tw"><table><thead><tr><th>Link</th><th>Rede</th><th>Link curto</th><th class="n">7 dias</th><th class="n">Total</th><th>Último clique</th><th></th></tr></thead><tbody>${D.links.map(l=>`<tr class="${l.ativo?"":"lk-off"}"><td><b>${esc(l.nome)}</b><div class="lk-msg">${l.tipo==="whatsapp"?"WhatsApp · "+esc(l.mensagem||"sem mensagem"):"Site · "+esc(l.url)}</div>${D.todos&&l.unidade?`<div class="lk-msg">${esc(l.unidade)}</div>`:""}</td><td>${esc(D.redes[l.rede]||l.rede)}</td><td class="lk-url">${esc(curto(l.codigo))}</td><td class="n">${l.cliques7}</td><td class="n"><b>${l.cliques}</b></td><td>${l.ativo?quando(l.ultimo):"desativado"}</td><td><div class="lk-acts"><button type="button" class="lk-btn g" data-copiar="${l.codigo}">Copiar</button><button type="button" class="lk-btn g" data-msg="${l.codigo}">Editar</button><button type="button" class="lk-btn g" data-ativo="${l.codigo}">${l.ativo?"Desativar":"Ativar"}</button><button type="button" class="lk-btn g" data-apagar="${l.codigo}">Excluir</button></div></td></tr>`).join("")}</tbody></table></div>`;
+}
+function render(){
+  if(!D){ box.innerHTML='<section class="lk-card"><h2>Links rastreáveis</h2><p class="lk-sub">Carregando…</p></section>'; return; }
+  const ativos=D.links.filter(l=>l.ativo).length, c7=D.links.reduce((a,l)=>a+l.cliques7,0), c30=D.links.reduce((a,l)=>a+l.cliques30,0), top=porRede()[0];
+  box.innerHTML=`<section class="lk-card"><h2>Links rastreáveis</h2><p class="lk-sub">Crie um link curto para cada rede social (bio do Instagram, Facebook, Google, panfleto…). Cada clique é contado e mostra qual canal orgânico mais traz contatos, sem anúncio. O link leva ao WhatsApp da escola com a mensagem pronta, já dizendo de onde a pessoa veio, ou ao site com UTM.</p>
+    <div class="lk-kpis"><div class="lk-kpi"><small>Links ativos</small><b>${ativos}</b><span>${D.links.length} criados</span></div><div class="lk-kpi"><small>Cliques 7 dias</small><b>${c7}</b><span>todos os links</span></div><div class="lk-kpi"><small>Cliques 30 dias</small><b>${c30}</b><span>todos os links</span></div><div class="lk-kpi"><small>Rede que mais traz</small><b style="font-size:18px">${top?esc(D.redes[top[0]]||top[0]):"—"}</b><span>${top?top[1]+" clique(s) em "+D.dias+" dias":"sem cliques ainda"}</span></div></div></section>
+   ${form()}
+   <div class="lk-grid"><section class="lk-card"><h3>Cliques por dia</h3><p class="lk-sub">Últimos ${D.dias} dias. Passe o mouse na barra para ver o número.</p>${graficoDias()}</section><section class="lk-card"><h3>Cliques por rede</h3><p class="lk-sub">Qual canal orgânico mais trouxe cliques.</p>${graficoRedes()}</section></div>
+   <section class="lk-card"><h3>Seus links</h3><p class="lk-sub">Copie o link curto e cole na bio, no post, no Google ou no QR Code do panfleto. Prévias automáticas de redes sociais e cliques repetidos em seguida não contam.</p>${tabela()}</section>`;
+}
+async function carregar(){
+  if(carregando) return; carregando=true;
+  try{ D=await api("GET","/api/links?dias=30"); D.todos=!!(window.GV_SESSION&&window.GV_SESSION.master); window.GV_LINKS=D; }catch(e){ if(!D) box.innerHTML='<section class="lk-card"><h2>Links rastreáveis</h2><p class="lk-sub">'+esc(e.message)+'</p></section>'; carregando=false; return; }
+  carregando=false; render();
+}
+box.addEventListener("click",async e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const vals=()=>({num:(box.querySelector("#lkNum")||{}).value,msg:(box.querySelector("#lkMsg")||{}).value,url:(box.querySelector("#lkUrl")||{}).value});
+  if(b.dataset.tipo){ const v=vals(); if(v.num!=null) sv("num",v.num); if(v.msg!=null) sv("msg",v.msg); if(v.url!=null) sv("url",v.url); tipo=b.dataset.tipo; sv("tipo",tipo); render(); return; }
+  if(b.dataset.rede){ const k=b.dataset.rede; sel.has(k)?sel.delete(k):sel.add(k); sv("redes",[...sel]); b.setAttribute("aria-pressed",sel.has(k)); const c=box.querySelector("#lkCriar"); if(c) c.textContent="Criar "+(sel.size>1?sel.size+" links":"link"); return; }
+  if(b.id==="lkCriar"){
+    if(!sel.size){ toastL("Escolha pelo menos uma rede."); return; }
+    const v=vals(), nome=(box.querySelector("#lkNome")||{}).value||"", camp=(box.querySelector("#lkCamp")||{}).value||"";
+    if(tipo==="whatsapp"){ if(String(v.num||"").replace(/\D/g,"").length<10){ toastL("Informe o WhatsApp com DDD."); box.querySelector("#lkNum").focus(); return; } sv("num",v.num); sv("msg",v.msg); }
+    else { if(!/^https?:\/\//i.test(String(v.url||"").trim())){ toastL("Informe o endereço completo, começando com https://"); box.querySelector("#lkUrl").focus(); return; } sv("url",v.url); }
+    b.disabled=true; let ok=0, erro=null;
+    for(const r of [...sel]){ const rn=D.redes[r]||r;
+      try{ await api("POST","/api/links",{tipo,rede:r,nome:nome?nome+" · "+rn:"",numero:v.num,mensagem:String(v.msg||"").replace(/\{rede\}/g,rn),url:v.url,campanha:camp}); ok++; }catch(x){ erro=x.message; break; } }
+    b.disabled=false; if(ok) toastL(ok+(ok>1?" links criados":" link criado")+". Copie e cole em cada rede."); if(erro) toastL(erro); carregar(); return;
+  }
+  const l=D&&D.links.find(x=>x.codigo===(b.dataset.copiar||b.dataset.ativo||b.dataset.apagar||b.dataset.msg)); if(!l) return;
+  if(b.dataset.copiar){ try{ await navigator.clipboard.writeText(curto(l.codigo)); toastL("Link copiado: "+curto(l.codigo)); }catch(x){ prompt("Copie o link:",curto(l.codigo)); } return; }
+  if(b.dataset.ativo){ try{ await api("PATCH","/api/links/"+l.codigo,{ativo:!l.ativo}); toastL(l.ativo?"Link desativado: quem clicar verá que não está disponível.":"Link ativado."); carregar(); }catch(x){ toastL(x.message); } return; }
+  if(b.dataset.apagar){ if(!confirm("Excluir o link “"+l.nome+"” e todos os cliques dele? Quem já tiver o link verá que não está disponível.")) return; try{ await api("DELETE","/api/links/"+l.codigo); toastL("Link excluído."); carregar(); }catch(x){ toastL(x.message); } return; }
+  if(b.dataset.msg){
+    const nome=prompt("Nome do link:",l.nome); if(nome==null) return;
+    const campo=l.tipo==="whatsapp"?prompt("Mensagem que já vem escrita no WhatsApp:",l.mensagem):prompt("Endereço do site:",l.url); if(campo==null) return;
+    try{ await api("PATCH","/api/links/"+l.codigo,l.tipo==="whatsapp"?{nome,mensagem:campo}:{nome,url:campo}); toastL("Link atualizado. O link curto continua o mesmo."); carregar(); }catch(x){ toastL(x.message); }
+  }
+});
+window.GV_LINKS_TELA=()=>{ render(); carregar(); };
+window.GV_LINKS_CARREGAR=carregar;
+setTimeout(()=>{ if(!window.GV_LINKS) carregar(); },3000);
+})();
+</script>
 <style>
 /* Conta › Uso de IA: limite mensal, gráfico diário e gasto por função */
 #view-uso .uso-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
@@ -8263,6 +8397,7 @@ const GUIA=[
  {g:"Mercado",k:"hor",n:"Horários e mídias",p:"Mostra em que dias e horários o público pesquisa e usa cada mídia, em mapa de calor, e aceita seus próprios dados de campanha.",s:["Clique em “+ Monitorar público atual” para criar o monitor do filtro que está nas Praças.","Escolha a mídia no mapa de calor.","Em “Seus dados de campanha”, importe o relatório da sua campanha para usar os seus números reais."],d:"Use as “Melhores janelas por mídia” para programar anúncios e posts."},
  {g:"Demanda",k:"v:conteudo",n:"Agenda de conteúdo",p:"A IA monta um calendário editorial de 30 dias (Reels, Carrossel, Stories…) do topo do funil até a conversão, usando o perfil e a praça.",s:["Escolha frequência, data de início, objetivo do mês e formatos.","Marque “usar dados da praça” para regionalizar.","Clique em “Gerar agenda de conteúdo” e salve o plano.","Leve os posts da semana para o Checklist semanal."],d:"A agenda não repete temas já usados em agendas salvas."},
  {g:"Demanda",k:"dicas",n:"Dicas da praça",p:"Plano de ações locais por município e bairros: onde panfletar, parcerias, eventos, mídia local, com verba e objetivo.",s:["Digite o município ou clique em “Usar o do mapa”.","Marque os bairros em foco e, se quiser, objetivo e verba.","Clique em “✦ Gerar com IA”.","Use “Levar para Captação externa →” para virar roteiro de campo."],d:"Os planos ficam em “Planos salvos”."},
+ {g:"Demanda",k:"links",n:"Links rastreáveis",p:"Cria um link curto para cada rede social ou canal (Instagram, Facebook, Google, panfleto com QR Code…) que leva ao WhatsApp da escola com a mensagem pronta, ou ao site com UTM. Conta os cliques de cada link para mostrar qual canal orgânico mais traz contatos.",s:["No menu, em Demanda, clique em Links rastreáveis.","Escolha WhatsApp ou Site.","Marque as redes onde vai usar o link (sai um link para cada uma).","No WhatsApp, informe o número com DDD e ajuste a mensagem; {rede} vira o nome da rede, para você saber de onde a pessoa veio.","Clique em Criar e use Copiar para colar cada link na rede certa.","Acompanhe os cliques por dia e por rede nos gráficos."],d:"Use um link diferente em cada lugar (bio, stories, Google, panfleto): é assim que o número de cliques mostra qual canal funciona. Prévias automáticas das redes e cliques repetidos em seguida não contam."},
  {g:"Prospecção",k:"v:captacao",n:"Captação externa",p:"Plano de campo com dados do GeoVenda: roteiro de visitas por bairro, scripts presenciais, parcerias e cadastro dos contatos feitos na rua.",s:["Escolha o município e marque os bairros.","Marque as ações de campo (porta a porta, comércio, empresas, escolas, condomínios, eventos).","Gere o plano e siga o roteiro.","Cadastre cada contato feito: ele entra no Acompanhamento com follow-up agendado."],d:"Contatos da rua aparecem no filtro “Captação externa” do Acompanhamento."},
  {g: "Atendimento", k: "v:qualificacao", n: "Qualificação de leads", p: "Registra cada lead novo, classifica em quente, morno ou frio pelos critérios do negócio, distribui entre os vendedores e mede o tempo de primeira resposta, com alerta quando passa do limite.", s: ["Em Novo lead, preencha nome, WhatsApp, canal e a hora em que chegou.", "Marque os critérios que o lead cumpre: a temperatura aparece na hora.", "Confira o responsável (a regra de distribuição sugere) e clique em Registrar lead.", "Na Fila de primeira resposta, copie a 1ª mensagem, envie e clique em Registrar 1ª resposta.", "Em Configurar critérios, ajuste pontos, faixas, limite de minutos, vendedores e a regra de distribuição."], d: "O lead fica vermelho quando passa do limite de 1ª resposta. Marcar o Primeiro contato como enviado no Acompanhamento também registra a 1ª resposta."},
  {"g": "Atendimento", "k": "v:pipeline", "n": "Adicionar e importar leads", "p": "Inclui leads ou clientes à mão, por planilha (Excel ou CSV) ou por PDF/texto (a IA extrai). Leads que já existem, pelo mesmo WhatsApp ou nome, são atualizados em vez de duplicados.", "s": ["Clique em “+ Adicionar leads” no Pipeline ou no Acompanhamento, em “Importar lista” na Qualificação, em “Importar perdidos” na Reativação ou em “Importar clientes” na Renovação.", "Escolha Manual, Excel ou CSV, ou PDF ou texto.", "Na planilha, confira as colunas reconhecidas (dá para trocar) e a prévia; no PDF, clique em Extrair com IA e revise.", "Marque as linhas e clique em Importar selecionados."], "d": "Use “Baixar planilha-modelo” para ter as colunas certas. Etapas aceitas: novo, em contato, aula agendada, aula realizada, proposta, negociação, fechou e perdido (com motivo)."},
@@ -8294,7 +8429,7 @@ const GUIA=[
  {g:"Medir",k:"f:importar",n:"Importar / exportar",p:"Importa as planilhas-modelo da rede e baixa os dados nos modelos originais ou em um resumo em Excel.",s:["Arraste a planilha da rede (o app reconhece pelas abas).","Confira Escola e Ano antes de importar.","Use “Baixar nos modelos da rede” para devolver preenchido."],d:"A importação grava na escola e no ano selecionados no topo."},
  {g:"Medir",k:"f:unidades",n:"Escolas",p:"Cadastro das escolas (nome, master, endereço, contatos, logo), usado no cabeçalho e rodapé dos PDFs, e a equipe de cada escola (vendedores e demais colaboradores).",s:["Clique em “Cadastrar escola”.","Preencha os dados e envie a logo.","Em “Equipe da escola”, clique em “Novo colaborador”, escolha a escola de onde a pessoa é (para quem tem mais de uma unidade), informe nome, função e contato e salve.","Use “Ver escola de exemplo” para conhecer o funil com dados fictícios."],d:"Cada escola tem funil, pesquisas, conteúdo e equipe separados. Colaboradores ativos com função Vendedor(a) ou Consultor(a) comercial aparecem no Vendedor: responsável pelos leads, Simulador, Analisar print, Ranking e Consultor em Treinamentos. Marque como Inativo quem saiu da equipe."},
  {g:"Conta",k:"v:historico",n:"Histórico",p:"Tudo o que a IA gerou nas ferramentas do Vendedor (rotinas, objeções, agendas, análises), para consultar depois.",s:["Abra o Histórico.","Clique em um item para reler."],d:"Fica salvo neste navegador."},
- {g:"Conta",k:"acessos",n:"Unidades e acessos",p:"Só para o franqueador: mostra quem já entrou no GeoVenda (papel e unidade vêm do sistema da Top English) e permite corrigir o estado (UF) e a cidade de cada unidade.",s:["No menu, em Conta, clique em Unidades e acessos.","Em Quem já entrou, confira o papel e a unidade de cada pessoa.","Em Unidades, corrija a UF ou a cidade que vier errada e clique em Salvar."],d:"O master só vê os dados da UF e do funil da unidade dele; por isso a UF da unidade precisa estar certa."},
+  {g:"Conta",k:"acessos",n:"Unidades e acessos",p:"Só para o franqueador: mostra quem já entrou no GeoVenda (papel e unidade vêm do sistema da Top English) e permite corrigir o estado (UF) e a cidade de cada unidade.",s:["No menu, em Conta, clique em Unidades e acessos.","Em Quem já entrou, confira o papel e a unidade de cada pessoa.","Em Unidades, corrija a UF ou a cidade que vier errada e clique em Salvar."],d:"O master só vê os dados da UF e do funil da unidade dele; por isso a UF da unidade precisa estar certa."},
  {g:"Conta",k:"uso",n:"Uso de IA",p:"Mostra quanto do limite mensal de IA (US$ 10 por pessoa) você já usou, quanto falta, o consumo por dia e em quais funções a IA mais gastou.",s:["No menu, em Conta, clique em Uso de IA (ou na barra IA DO MÊS, no quadro com seu nome).","Veja a barra: quanto já usou e quantos por cento ainda restam.","No gráfico Consumo por dia, passe o mouse nas barras para ver o valor de cada dia.","Em Gasto por função e na tabela, veja onde a IA mais gastou e o custo médio de cada uso."],d:"O limite não acumula: volta para US$ 10 todo dia 5. Se chegar a US$ 10 antes disso, a IA fica bloqueada até o dia 5."},
  {g:"Assistente",k:"",n:"Carol, assistente de vendas (este balão)",p:"Lê os dados do app e os arquivos anexados, monta o plano do dia, da semana e do mês, escreve mensagens e ensina a usar o GeoVenda.",s:["Use Hoje, Semana ou Mês para os resumos.","Clique no clipe para anexar PDF, Excel, CSV, Word, texto ou print.","Pergunte “como faço…” para aprender qualquer tela; o botão “?” abre o guia."],d:"Arquivos anexados ficam só neste navegador; remova no × ou em “Remover todos”."}
 ];
@@ -8392,6 +8527,9 @@ ${guiaTexto()}
 
 === FUNIL DA ESCOLA (módulo Medir · GeoFunil: leads e matrículas por fonte, investimento, CPL, CAC, metas, pesquisas de satisfação e pós-venda, conteúdo da escola, ações e influenciadores) ===
 ${dadosFunil()}
+
+=== LINKS RASTREÁVEIS (Demanda > Links rastreáveis {{abrir:links}}: cliques orgânicos por rede social) ===
+${(()=>{ const d=window.GV_LINKS; if(!d) return "Ainda carregando (não quer dizer que não há links)."; if(!d.links.length) return "NÃO CADASTRADO: nenhum link rastreável criado."; const r={}; d.serie.forEach(x=>{ r[x.rede]=(r[x.rede]||0)+x.cliques; }); return "Cliques por rede nos últimos "+d.dias+" dias: "+(Object.entries(r).sort((a,b)=>b[1]-a[1]).map(([k,v])=>(d.redes[k]||k)+" "+v).join("; ")||"nenhum clique")+"\nLinks: "+d.links.map(l=>l.nome+" ("+(d.redes[l.rede]||l.rede)+", "+(l.tipo==="whatsapp"?"WhatsApp":"site")+", "+(l.ativo?"ativo":"desativado")+"): "+l.cliques+" cliques no total, "+l.cliques7+" em 7 dias").join("; "); })()}
 
 === USO DE IA DO MÊS (Conta > Uso de IA {{abrir:uso}}) ===
 ${(()=>{ const u=window.GV_USO; if(!u) return "Ainda carregando."; const f=x=>"US$ "+(x||0).toFixed(2).replace(".",","); return "Limite "+f(u.limite)+" por mês, renova em "+u.ciclo.renovaEm+" (todo dia 5, não acumula). Usado "+f(u.gasto)+" ("+Math.round(u.usadoPct)+"%), restante "+f(u.restante)+" ("+Math.round(u.restantePct)+"%), "+u.chamadas+" usos."+(u.bloqueado?" LIMITE ATINGIDO: IA bloqueada até a renovação.":"")+"\nPor função: "+((u.porFuncao||[]).map(x=>x.funcao+" "+f(x.custo)+" em "+x.chamadas+" usos").join("; ")||"sem uso neste ciclo"); })()}

@@ -24,7 +24,7 @@ Após CADA alteração concluída e testada neste projeto:
 - Alterações grandes ou arriscadas (trocar de arquitetura, remover dados, mexer em login/banco/regras de acesso) exigem confirmação do usuário antes.
 
 ## Regras de autenticação (obrigatórias)
-- TODO o sistema exige login. Nenhuma rota nova pode ser pública, exceto `/healthz`, `/login`, `/auth/login` e `/auth/logout`.
+- TODO o sistema exige login. Nenhuma rota nova pode ser pública, exceto `/healthz`, `/login`, `/auth/login` e `/auth/logout` e `/l/<código>` (links rastreáveis, aprovado pela usuária em 25/11/2026: só conta o clique e redireciona para o WhatsApp ou o site; não mostra nenhum dado; regras em `server/links.js`).
 - O servidor só serve arquivos de `public/` (e `login/` na parte pública). Nunca servir a raiz do projeto.
 - A autenticação é a do Top English CMS, em dois modos escolhidos pela variável `CMS_API`:
   - `admin` (padrão, decisão da usuária em 17/11/2026): API `/admin` de `docs/INTEGRACAO_API_FRONT.md`. Login `POST /admin/auth/login` (responde 201) e validação `GET /admin/auth/me` com Bearer, que devolve `role_id` e unidade. Hoje está em `cmsdev.topenglish.com.br`; depois vai para `cms.topenglish.com.br`.

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import * as auth from "./auth.js";
 import * as db from "./db.js";
 import * as ai from "./ai.js";
+import * as links from "./links.js";
 import { identidade, identidadeAdmin, ufDe, MSG_SEM_ACESSO, MSG_PERFIL_BLOQUEADO, franqueadoresFixos } from "./roles.js";
 import crypto from "node:crypto";
 
@@ -36,6 +37,8 @@ app.use((req, res, next) => {
 app.get("/healthz", (req, res) => res.json({ status: "ok" }));
 app.get("/login", (req, res) => { res.set("Cache-Control", "no-store"); res.sendFile(path.join(LOGIN, "login.html")); });
 app.use("/login", express.static(LOGIN, { index: false, dotfiles: "deny", fallthrough: false }));
+// Link rastreável (exceção pública aprovada em 25/11/2026): só conta o clique e redireciona; não mostra dados
+app.get("/l/:codigo", (req, res) => links.redirecionar(req, res));
 
 function proximoSeguro(n) {
   return typeof n === "string" && /^\/(?!\/)[^\\\s]*$/.test(n) && !n.startsWith("/login") ? n : "/";
@@ -169,6 +172,10 @@ app.post("/api/pessoas", json2mb, async (req, res) => {
   try { res.json(await db.perfis((req.body || {}).ids)); } catch (e) { trataErro(res, e); }
 });
 app.get("/api/ai/limits", (req, res) => res.json(ai.limites()));
+app.get("/api/links", (req, res) => links.listar(req.gv, req.query.dias).then(r => res.set("Cache-Control", "no-store").json(r)).catch(e => links.trata(res, e)));
+app.post("/api/links", express.json({ limit: "20kb" }), (req, res) => links.criar(req.gv, req.body).then(r => res.status(201).json(r)).catch(e => links.trata(res, e)));
+app.patch("/api/links/:codigo", express.json({ limit: "20kb" }), (req, res) => links.editar(req.gv, req.params.codigo, req.body).then(r => res.json(r)).catch(e => links.trata(res, e)));
+app.delete("/api/links/:codigo", (req, res) => links.apagar(req.gv, req.params.codigo).then(() => res.json({ ok: true })).catch(e => links.trata(res, e)));
 app.get("/api/ai/uso", (req, res) => ai.uso(req, res, req.gv).catch(e => trataErro(res, e)));
 app.get("/api/ai/diagnostico", (req, res) => { if (!req.gv || !req.gv.master) return res.status(403).json({ code: "forbidden", message: "Só o franqueador pode testar a IA." }); ai.diagnostico(req, res).catch(e => trataErro(res, e)); });
 app.post("/api/ai/sample", express.json({ limit: "30mb" }), (req, res) => ai.sample(req, res, req.gv).catch(e => trataErro(res, e)));

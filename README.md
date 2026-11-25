@@ -13,6 +13,7 @@ navegador ──► servidor GeoVenda (Railway) ──► Top English CMS  (logi
 ```
 
 - **Público** (só isto): `/healthz`, `/login`, `/login/*`, `POST /auth/login` e `POST /auth/logout`.
+- **Público, só redireciona:** `GET /l/<código>` (links rastreáveis). Conta o clique (só o horário, sem IP; ignora prévias de redes sociais e cliques repetidos em 10 s) e manda para o destino montado no servidor: `wa.me/<número>?text=` ou o site com `utm_source=<rede>&utm_medium=organic`. Código inexistente ou desativado: 404 sem dados. A criação e os números ficam em `/api/links` (com login; master só a própria unidade, franqueador todas).
 - **Todo o resto exige sessão.** Sem sessão:
   - páginas redirecionam para `/login`;
   - arquivos e API respondem `401`.

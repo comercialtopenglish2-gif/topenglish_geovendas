@@ -126,6 +126,19 @@ const api = (cookie, method, caminho, body) => req(caminho, { cookie, method, bo
   ok("master não mexe no estoque", (await db(rj.cookie, "set", { path: "estoque/e1", data: { campanhaId: "black-friday-2026", unidadeId: "u7", recebidas: 99 } })).status === 403);
   ok("franqueador lança estoque e master lê o dele", (await db(f.cookie, "set", { path: "estoque/e1", data: { campanhaId: "black-friday-2026", unidadeId: "u7", recebidas: 50 } })).status === 200 && ((await db(rj.cookie, "list", { path: "estoque" })).json.docs || []).length === 1);
 
+  // 7b. links rastreáveis: /l/<código> é público, mas só redireciona; a API exige login e respeita a unidade
+  ok("sem login /api/links", (await api(null, "GET", "/api/links")).status === 401);
+  const lk = await api(rj.cookie, "POST", "/api/links", { tipo: "whatsapp", rede: "ig", numero: "21999990000", mensagem: "Vim pelo Instagram" });
+  ok("master cria link do WhatsApp", lk.status === 201 && /^https:\/\/wa\.me\/5521999990000\?text=/.test(lk.json.destino), String(lk.status));
+  ok("link com destino perigoso é recusado", (await api(rj.cookie, "POST", "/api/links", { tipo: "site", rede: "ig", url: "javascript:alert(1)" })).status === 400);
+  const pub = await req("/l/" + lk.json.codigo);
+  ok("/l/<código> público só redireciona, sem dados", pub.status === 302 && /^https:\/\/wa\.me\//.test(pub.loc) && !/GV_SESSION|espaco|criado_por/.test(pub.txt));
+  ok("/l/ inexistente: 404 sem dados", (await req("/l/zzzzzz9")).status === 404);
+  ok("/l/ não abre outras rotas", (await req("/l/" + lk.json.codigo + "/x")).status === 302 && /^\/login/.test(new URL((await req("/l/" + lk.json.codigo + "/x")).loc, BASE).pathname));
+  ok("outro master não vê nem edita o link", ((await api(novo.cookie, "GET", "/api/links")).json.links || []).length === 0 && (await api(novo.cookie, "PATCH", "/api/links/" + lk.json.codigo, { ativo: false })).status === 404);
+  ok("franqueador vê o link de todas as unidades", ((await api(f.cookie, "GET", "/api/links")).json.links || []).some(x => x.codigo === lk.json.codigo));
+  ok("link desativado para de abrir", (await api(rj.cookie, "PATCH", "/api/links/" + lk.json.codigo, { ativo: false })).status === 200 && (await req("/l/" + lk.json.codigo)).status === 404);
+
   // 8. cookie falso e logout
   ok("cookie falso volta ao login", (await req("/", { cookie: "gv_session=" + "a".repeat(64) })).status === 302);
   ok("token do CMS no cookie não é aceito", (await req("/", { cookie: "gv_session=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxfQ.x" })).status === 302);
